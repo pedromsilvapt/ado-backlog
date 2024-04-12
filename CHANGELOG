@@ -1,0 +1,23 @@
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+
+## [0.1.0]
+
+### Added - 2022-12-11
+
+- Fetch Projects, Teams and Sprints
+- Fetch Sprint team members, working days and days off
+- Fetch tasks and calculate global capacities
+- Created initial frontend GUI
+
+## [0.2.0] - 2019-12-12
+
+### Added
+
+ - Aded shortcuts
+
+### Changed
+ - Made inspector card collapsable
