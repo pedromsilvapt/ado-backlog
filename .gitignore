@@ -38,5 +38,6 @@ typings/
 *.js
 test/*.js
 *.map
+build/*
 
 config.kdl

@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "description": "",
   "main": "server/index.js",
-  "bin": "server/index.js",
+  "bin": "cli.js",
   "pkg": {
     "scripts": [
       "server/**/*.js",
