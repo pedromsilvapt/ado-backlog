@@ -77,7 +77,7 @@ export class DownloadCommand extends Command {
 
         const workItemStateColors = await azure.getWorkItemStates(project.name!);
 
-        const backlog = new Backlog(workItemTypes, workItemStateColors, backlogConfig, this.config.toc, tree);
+        const backlog = new Backlog(workItemTypes, workItemStateColors, backlogConfig, this.config.toc, this.config.workItems, tree);
 
         // const exporter: Exporter = new JsonExporter(backlog, workItemTypes, tree, this.config.templates);
         const exporter: Exporter = new HTMLExporter(this.logger, azure, backlog, this.config.templates);

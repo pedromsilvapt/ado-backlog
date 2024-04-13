@@ -1,10 +1,12 @@
 import { WorkItem } from 'azure-devops-node-api/interfaces/WorkItemTrackingInterfaces';
-import { BacklogConfig, TableOfContentsConfig } from './config';
+import { BacklogConfig, TableOfContentsConfig, WorkItemsConfig } from './config';
 
 export class Backlog {
     public config: BacklogConfig;
 
     public toc: TableOfContentsConfig;
+
+    public workItemTypesConfig: WorkItemsConfig | undefined;
 
     public workItemTypes: BacklogWorkItemType[];
 
@@ -13,15 +15,48 @@ export class Backlog {
     public workItems: BacklogWorkItem[];
     public backlogIndex: Record<number, BacklogWorkItem>;
 
-    public constructor(workItemTypes: BacklogWorkItemType[], workItemStateColors: BacklogWorkItemStateColors, backlogConfig: BacklogConfig, tocConfig: TableOfContentsConfig, workItems: BacklogWorkItem[]) {
+    public constructor(workItemTypes: BacklogWorkItemType[], workItemStateColors: BacklogWorkItemStateColors, backlogConfig: BacklogConfig, tocConfig: TableOfContentsConfig, workItemTypesConfig: WorkItemsConfig | undefined, workItems: BacklogWorkItem[]) {
         this.config = backlogConfig;
         this.toc = tocConfig;
+        this.workItemTypesConfig = workItemTypesConfig;
         this.workItemTypes = workItemTypes;
         this.workItemStateColors = workItemStateColors;
         this.workItems = workItems;
 
         this.backlogIndex = {};
         this.visit(wi => this.backlogIndex[wi.id] = wi);
+
+        this.applyWorkItemTypesOverrides();
+    }
+
+    protected applyWorkItemTypesOverrides() {
+        for (const wit of this.workItemTypes) {
+            const witOverride = this.workItemTypesConfig?.types?.find(type => type.name == wit.name);
+
+            if (witOverride != null) {
+                if (witOverride.icon != null) {
+                    wit.icon = witOverride.icon;
+                }
+
+                if (witOverride.color != null) {
+                    wit.color = witOverride.color;
+                }
+
+                if (witOverride.states != null && witOverride.states.length > 0) {
+                    let stateColors = this.workItemStateColors[wit.name];
+
+                    if (stateColors == null) {
+                        this.workItemStateColors[wit.name] = stateColors = {};
+                    }
+
+                    for (const stateOverride of witOverride.states) {
+                        if (stateOverride.color != null) {
+                            stateColors[stateOverride.name] = stateOverride.color;
+                        }
+                    }
+                }
+            }
+        }
     }
 
     public visit(visitor : (wi: BacklogWorkItem, end: boolean) => void, root : BacklogWorkItem | null = null, visitEnd : boolean = false) {

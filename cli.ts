@@ -23,8 +23,6 @@ const commands: Command[] = [
     new DownloadCommand(logger, config)
 ];
 
-
-
 let commandLine = yargs(process.argv.slice(2));
 
 for (const command of commands) {

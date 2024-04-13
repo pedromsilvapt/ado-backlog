@@ -17,6 +17,33 @@ export class ApiConfig {
     ignoreSsl!: boolean;
 }
 
+export class WorkItemsTypeStateConfig {
+    @Value(0, String)
+    name!: string;
+
+    @Property("color", String)
+    color?: string;
+}
+
+export class WorkItemsTypeConfig {
+    @Value(0, String)
+    name!: string;
+
+    @Children("state", WorkItemsTypeStateConfig)
+    states!: WorkItemsTypeStateConfig[];
+
+    @Optional() @Property("icon", String)
+    icon?: string;
+
+    @Optional() @Property("color", String)
+    color?: string;
+}
+
+export class WorkItemsConfig {
+    @Children("type", WorkItemsTypeConfig)
+    types!: WorkItemsTypeConfig[];
+}
+
 export class BacklogContentSortConfig {
     @Value(0, String)
     field!: string;
@@ -168,6 +195,9 @@ export class TfsConfig {
 
     @Child("api", ApiConfig)
     api!: ApiConfig;
+
+    @Optional() @Child("workItems", WorkItemsConfig)
+    workItems?: WorkItemsConfig;
 
     @Children("backlog", BacklogConfig)
     backlogs!: BacklogConfig[];
