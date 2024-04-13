@@ -13,7 +13,10 @@ export class Backlog {
     public workItemStateColors: BacklogWorkItemStateColors;
 
     public workItems: BacklogWorkItem[];
-    public backlogIndex: Record<number, BacklogWorkItem>;
+
+    public backlogById: Record<number, BacklogWorkItem>;
+
+    public views: Record<string, number[]>;
 
     public constructor(
         workItemTypes: BacklogWorkItemType[],
@@ -21,7 +24,8 @@ export class Backlog {
         backlogConfig: BacklogConfig,
         tocConfig: TableOfContentsConfig,
         workItemTypesConfig: WorkItemsConfig | undefined,
-        workItems: BacklogWorkItem[]
+        workItems: BacklogWorkItem[],
+        views: Record<string, number[]>
     ) {
         this.config = backlogConfig;
         this.toc = tocConfig;
@@ -29,9 +33,10 @@ export class Backlog {
         this.workItemTypes = workItemTypes;
         this.workItemStateColors = workItemStateColors;
         this.workItems = workItems;
+        this.views = views;
 
-        this.backlogIndex = {};
-        this.visit(wi => this.backlogIndex[wi.id] = wi);
+        this.backlogById = {};
+        this.visit(wi => this.backlogById[wi.id] = wi);
 
         this.applyWorkItemTypesOverrides();
     }
@@ -115,7 +120,7 @@ export class Backlog {
             for (const relation of relationsPath) {
                 workItems = workItems
                     .flatMap(wi => wi.relations.filter(link => link.relationName == relation))
-                    .map(link => this.backlogIndex[link.workItemId])
+                    .map(link => this.backlogById[link.workItemId])
                     .filter(wi => wi != null);
             }
 

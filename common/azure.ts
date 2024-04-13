@@ -5,7 +5,7 @@ import { LoggerInterface, pp } from 'clui-logger';
 import { DateTime, Settings } from 'luxon';
 import { BacklogContentConfig, TfsConfig } from './config';
 import { BacklogWorkItem, BacklogWorkItemType } from './model';
-import { WorkItem, WorkItemExpand } from 'azure-devops-node-api/interfaces/WorkItemTrackingInterfaces';
+import { QueryExpand, QueryHierarchyItem, WorkItem, WorkItemExpand } from 'azure-devops-node-api/interfaces/WorkItemTrackingInterfaces';
 import * as path from 'path';
 import { IWorkItemTrackingApi } from 'azure-devops-node-api/WorkItemTrackingApi';
 
@@ -105,20 +105,84 @@ export class AzureClient {
         return workItems;
     }
 
-    public async executeQuery(project: TeamProjectReference, queryName: string): Promise<WorkItem[]> {
+    public async getQueryResultsById(project: TeamProjectReference, queryId: string): Promise<number[]> {
         const witApi = await this.connection.getWorkItemTrackingApi();
 
-        const query = await witApi.getQuery(project.id!, queryName);
+        const query = await witApi.getQuery(project.id!, queryId);
 
         if (query == null) {
-            throw new Error(`No query found with name ${queryName} in project ${project.name!}`);
+            throw new Error(`No query found with ID "${queryId}" in project ${project.name!}`);
         }
+
+        this.logger.debug(pp`Executig query by id ${queryId} for project ${project?.name} (id ${project?.id})`);
 
         const results = await witApi.queryById(query.id!, {
             projectId: project.id!
         });
 
-        const workItems: WorkItem[] = await this.getWorkItemsById(results.workItems!.map(wi => wi.id!));
+        return results.workItems!.map(wi => wi.id!);
+    }
+
+    public async getQueryResultsByName(project: TeamProjectReference, queryName: string): Promise<number[]> {
+        const witApi = await this.connection.getWorkItemTrackingApi();
+
+        this.logger.debug(pp`Retrieving list of all queries for project ${project?.name} (id ${project?.id})`);
+
+        const allQueries = await witApi.getQueries(project.id!, QueryExpand.Minimal, 2);
+
+        const flattenQueries: (q : QueryHierarchyItem) => QueryHierarchyItem[] = q => [q, ...(q?.children?.flatMap(flattenQueries) ?? [])];
+
+        const query = allQueries.flatMap(flattenQueries).find(query => query.name == queryName);
+
+        if (query == null) {
+            throw new Error(`No query found with Name "${queryName}" in project ${project.name!}`);
+        }
+
+        this.logger.debug(pp`Executig query by id ${query.id!} for project ${project?.name} (id ${project?.id})`);
+
+        const results = await witApi.queryById(query.id!, {
+            projectId: project.id!
+        });
+
+        return results.workItems!.map(wi => wi.id!);
+    }
+
+    public async getQueryResultsByWiql(project: TeamProjectReference, queryWiql: string): Promise<number[]> {
+        const witApi = await this.connection.getWorkItemTrackingApi();
+
+        const query = `SELECT [System.Id] FROM workitems WHERE ` + queryWiql;
+
+        this.logger.debug(pp`Executig query by wiql ${query} for project ${project?.name} (id ${project?.id})`);
+
+        const results = await witApi.queryByWiql({ query }, {
+            projectId: project.id!
+        });
+
+        return results.workItems!.map(wi => wi.id!);
+    }
+
+    public async getQueryResults(project: TeamProjectReference, options: QueryObject): Promise<number[]> {
+        const notNullOptions = [options.query, options.queryId, options.queryName].filter(p => p != null);
+
+        if (notNullOptions.length > 1) {
+            throw new Error(`One and only one query option should be provided: id, name or wiql, ${notNullOptions.length} were provided instead.`);
+        }
+
+        if (options.queryId != null) {
+            return this.getQueryResultsById(project, options.queryId);
+        } else if (options.queryName != null) {
+            return this.getQueryResultsByName(project, options.queryName);
+        } else if (options.query != null) {
+            return this.getQueryResultsByWiql(project, options.query);
+        } else {
+            throw new Error("No query Id, Name or Wiql expression provided.");
+        }
+    }
+
+    public async getQueryWorkItems(project: TeamProjectReference, options: QueryObject): Promise<WorkItem[]> {
+        const results = await this.getQueryResults(project, options);
+
+        const workItems: WorkItem[] = await this.getWorkItemsById(results);
 
         return workItems;
     }
@@ -334,4 +398,10 @@ export class AzureClient {
 
         return workItemStateColors;
     }
+}
+
+export interface QueryObject {
+    query?: string;
+    queryId?: string;
+    queryName?: string;
 }

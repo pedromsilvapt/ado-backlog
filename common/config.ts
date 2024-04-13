@@ -73,18 +73,41 @@ export class BacklogContentConfig {
     }
 }
 
+export class BacklogViewConfig {
+    @Value(0, String)
+    name!: string;
+
+    @Optional() @Property('query', String)
+    query?: string;
+
+    @Optional() @Property('queryId', String)
+    queryId?: string;
+
+    @Optional() @Property('queryName', String)
+    queryName?: string;
+}
+
 export class BacklogConfig {
     @Value(0, String)
     name!: string;
 
-    @Property('query', String)
-    query!: string;
+    @Optional() @Property('query', String)
+    query?: string;
+
+    @Optional() @Property('query-id', String)
+    queryId?: string;
+
+    @Optional() @Property('query-name', String)
+    queryName?: string;
 
     @Property('project', String)
     project!: string;
 
     @Children('content', BacklogContentConfig)
     content!: BacklogContentConfig[];
+
+    @Optional() @Children('view', BacklogViewConfig)
+    views!: BacklogViewConfig[];
 
     public * allWorkItemTypes() : IterableIterator<string> {
         for (const content of this.content) {

@@ -40,6 +40,8 @@ export class HTMLExporter extends Exporter {
 
         await this.exportHeader(buffer);
 
+        await this.exportViewsTabbar(buffer);
+
         await this.exportTableOfContents(buffer);
 
         buffer.push(`<div class="centered-layout">`);
@@ -129,6 +131,31 @@ export class HTMLExporter extends Exporter {
         }
 
         buffer.push(`</p>\n</header>\n`);
+    }
+
+    protected async exportViewsTabbar(buffer: string[]) {
+        const views = this.backlog.config.views;
+
+        if (views.length > 0) {
+            buffer.push(`<nav id="views">
+            <p class="views tabbar" data-tab-callback="onViewSelected">\n`);
+
+            buffer.push(`<a class="tab active" data-tab-context="all">All</a>`);
+
+            for (const view of views) {
+                const workItemIds = this.backlog.views[view.name].join(',');
+
+                buffer.push(`<a class="tab" data-tab-context="${workItemIds}">${view.name}</a>`);
+            }
+
+            buffer.push(`
+                </p>
+                <noscript>
+                    "Views" functionality is not available without JavaScript enabled.
+                    Please download this file and open it locally with your browser.
+                </noscript>
+            </nav>\n`);
+        }
     }
 
     protected async exportTableOfContents(buffer: string[]) {
@@ -318,7 +345,7 @@ export class HTMLExporter extends Exporter {
 
         const workItemType = this.backlog.getWorkItemType(workItem.type);
 
-        buffer.push(`<article class="" id="${workItem.id}" data-wi-id="${workItem.id}" data-wi-title=${JSON.stringify(workItem.title)} class="workitem ${workItem.typeSlug}">\n`);
+        buffer.push(`<article class="workitem ${workItem.typeSlug}" id="${workItem.id}" data-wi-id="${workItem.id}" data-wi-title=${JSON.stringify(workItem.title)} class="workitem ${workItem.typeSlug}">\n`);
         buffer.push(`<p style="margin-bottom: 0; margin-top: 0;">
         ${this.getIcon(workItemType.icon)}
         ${workItem.type.toUpperCase()} ${workItem.id}
@@ -753,7 +780,214 @@ const HTMLScript = `
     }
 
     initCollapsibleDataGrids();
-</script>`;
+</script>
+
+<script>
+function initTabBars() {
+    var tabBars = document.querySelectorAll(".tabbar");
+
+    for (const tabBarRoot of tabBars) {
+        for (const tab of tabBarRoot.querySelectorAll(".tab")) {
+            tab.addEventListener('click', onTabBarClick);
+        }
+    }
+}
+
+function onTabBarClick(event) {
+    var tab = event.target.closest(".tab");
+
+    var isActive = tab.classList.contains("active");
+
+    if (!isActive) {
+        var tabbar = tab.closest(".tabbar");
+
+        var allTabs = tabbar.querySelectorAll(".tab");
+
+        for (const otherTab of allTabs) {
+            if (otherTab != tab) {
+                otherTab.classList.remove("active");
+            }
+        }
+
+        tab.classList.add("active");
+
+        var context = tab.getAttribute("data-tab-context");
+        var callback = tabbar.getAttribute("data-tab-callback");
+
+        window[callback](context, tab);
+    }
+}
+
+function onViewSelected(idsString, tab) {
+    var hiddenWorkItems = document.querySelectorAll(".view-workitem-hidden, .view-workitem-faded");
+
+    for (var elem of hiddenWorkItems) {
+        elem.classList.remove("view-workitem-hidden");
+        elem.classList.remove("view-workitem-faded");
+    }
+
+    let grid = document.querySelector("#toc-grid");
+    let list = document.querySelector("#toc-list");
+
+    if (idsString == "all") {
+        // Collapse all work items in the TOC
+        if (grid != null) collapsibleDataGridSetAllCarets(grid, false);
+        if (list != null) collapsibleListSetAllCarets(list, false);
+
+        return;
+    }
+
+    // Expand all work items in the TOC
+    if (grid != null) collapsibleDataGridSetAllCarets(grid, true);
+    if (list != null) collapsibleListSetAllCarets(list, true);
+
+    var ids = new Set(idsString.split(",").map(id => id.trim()));
+
+    // Hide work items contents
+    for (const workItem of document.querySelectorAll("article.workitem")) {
+        var workItemId = workItem.getAttribute("data-wi-id");
+
+        if (!ids.has(workItemId.trim())) {
+            workItem.classList.add("view-workitem-hidden");
+        }
+    }
+
+    // Hide work item rows in Grid Table Of Contents
+    var gridParentsFaded = new Set();
+    for (const workItem of document.querySelectorAll("#toc-grid tr[data-grid-row-id]")) {
+        var workItemId = workItem.getAttribute("data-grid-row-id")?.trim();
+
+        // If this work item row was faded, skip it:
+        //   we already know that it is not in this view, but one of its children is
+        if (gridParentsFaded.has(workItemId)) {
+            continue;
+        }
+
+        if (!ids.has(workItemId)) {
+            workItem.classList.add("view-workitem-hidden");
+        } else {
+            // If this work item is included in the view, we need to check its ancestors
+            // If they are included in the view, we do nothing. If they are not, we fade them
+            var parentId = workItem.getAttribute("data-grid-parent-row-id")?.trim();
+
+            while (parentId != null && parentId != "") {
+                // If this work item is part of the view, stop the fading process
+                // It should be visibly, and it itself will handle the  fading of its ancestors
+                if (ids.has(parentId)) {
+                    break;
+                }
+
+                if (gridParentsFaded.has(parentId)) {
+                    break;
+                }
+
+                var parentRow = document.querySelector('#toc-grid tr[data-grid-row-id="' + parentId + '"]');
+
+                parentRow.classList.add("view-workitem-faded");
+                parentRow.classList.remove("view-workitem-hidden");
+
+                gridParentsFaded.add(parentId);
+
+                parentId = parentRow.getAttribute("data-grid-parent-row-id")?.trim();
+            }
+        }
+    }
+
+    // Fade work item parents in Grid Table Of Contents
+    var workItemRowsWithCarets = document.querySelectorAll("#toc-grid tr[data-grid-row-id]:has(.collapsible-data-grid-caret)");
+    for (const workItem of workItemRowsWithCarets) {
+        var workItemId = workItem.getAttribute("data-grid-row-id")?.trim();
+
+        var childWorkItems = document.querySelectorAll('#toc-grid tr[data-grid-parent-row-id="' + workItemId + '"]');
+
+        var areChildrenVisible = false;
+
+        for (const childWorkItem of childWorkItems) {
+            var childWorkItemId = childWorkItem.getAttribute("data-grid-row-id")?.trim();
+
+            if (ids.has(childWorkItemId)) {
+                areChildrenVisible = true;
+                break;
+            }
+        }
+
+        if (!areChildrenVisible) {
+            var caret = workItem.querySelector(".collapsible-data-grid-caret");
+
+            caret.classList.add("view-workitem-hidden");
+        }
+    }
+
+    // Hide work item rows in List Table Of Contents
+    var listParentsFaded = new Set();
+    for (const workItem of document.querySelectorAll("#toc-list li[data-list-item-id]")) {
+        var workItemId = workItem.getAttribute("data-list-item-id")?.trim();
+
+        // If this work item item was faded, skip it:
+        //   we already know that it is not in this view, but one of its children is
+        if (listParentsFaded.has(workItemId)) {
+            continue;
+        }
+
+        if (!ids.has(workItemId)) {
+            workItem.classList.add("view-workitem-hidden");
+        } else {
+            // If this work item is included in the view, we need to check its ancestors
+            // If they are included in the view, we do nothing. If they are not, we fade them
+            var parentId = workItem.getAttribute("data-list-parent-item-id")?.trim();
+
+            while (parentId != null && parentId != "") {
+                // If this work item is part of the view, stop the fading process
+                // It should be visibly, and it itself will handle the  fading of its ancestors
+                if (ids.has(parentId)) {
+                    break;
+                }
+
+                if (listParentsFaded.has(parentId)) {
+                    break;
+                }
+
+                var parentItem = document.querySelector('#toc-list li[data-list-item-id="' + parentId + '"]');
+
+                parentItem.classList.add("view-workitem-faded");
+                parentItem.classList.remove("view-workitem-hidden");
+
+                listParentsFaded.add(parentId);
+
+                parentId = parentItem.getAttribute("data-list-parent-item-id")?.trim();
+            }
+        }
+    }
+
+    // Hide work item carets in List Table Of Contents
+    var workItemItemsWithCarets = document.querySelectorAll("#toc-list li[data-list-item-id]:has(.collapsible-list-caret)");
+    for (const workItem of workItemItemsWithCarets) {
+        var workItemId = workItem.getAttribute("data-list-item-id")?.trim();
+
+        var childWorkItems = document.querySelectorAll('#toc-list tr[data-list-parent-item-id="' + workItemId + '"]');
+
+        var areChildrenVisible = false;
+
+        for (const childWorkItem of childWorkItems) {
+            var childWorkItemId = childWorkItem.getAttribute("data-list-item-id")?.trim();
+
+            if (ids.has(childWorkItemId)) {
+                areChildrenVisible = true;
+                break;
+            }
+        }
+
+        if (!areChildrenVisible) {
+            var caret = workItem.querySelector(".collapsible-list-caret");
+
+            caret.classList.add("view-workitem-hidden");
+        }
+    }
+}
+
+initTabBars();
+</script>
+`;
 
 const HTMLStylesheetOverrides = `
 body {
@@ -939,6 +1173,38 @@ table.data-grid tr td .state-indicator {
     width: 10px;
     height: 10px;
     border-radius: 50%;
+}
+
+.views {
+    text-align: center;
+}
+
+.views a.tab {
+    display: inline-block;
+    padding: 0 8px;
+    color: rgba(0, 0, 0, 0.9);
+    padding-top: 10px;
+    padding-bottom: 10px;
+    cursor: pointer;
+    margin-bottom: 10px;
+    margin-right: 10px;
+    border-bottom: 2px solid transparent;
+
+    transition: color ease-in-out 0.25s, background-color ease-in-out 0.25s;
+}
+
+.views a.active {
+    font-weight: 600;
+    border-bottom: 2px solid rgba(0, 120, 212, 1);
+}
+
+.view-workitem-hidden {
+    display: none;
+    visibility: hidden;
+}
+
+.view-workitem-faded {
+    opacity: 0.3;
 }
 `;
 

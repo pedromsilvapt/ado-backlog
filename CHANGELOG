@@ -8,7 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Added
 
- - Added work-item overrides
+ - Work-item type overrides (icon, color, states, etc...)
     ```json
     workItems {
         type "User Story" {
@@ -17,7 +17,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
         }
     }
     ```
- - Added work-item specific columns for the table of contents. **Note** The number of columns for all work item types must be the same!
+ - Work-item specific columns for the table of contents. **Note** The number of columns for all work item types must be the same!
     ```json
     value width="90px"  header="State" field="System.State"
     // For the story points, omit the field for Epic and Feature work items, so the column is empty
@@ -25,10 +25,34 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
     value width="60px" header="Story Points" field="Microsoft.VSTS.Scheduling.StoryPoints" align="right" { workItems "User Story" "Bug"; }
     value width="200px" header="Value Area" field="Microsoft.VSTS.Common.ValueArea"
     ```
+ - Possibility to query the backlog by a WIQL expression (`backlog query="..."`), or by query name (`backlog query-name="..."`) in addition to the already existing query by id functionality (`backlog query-id="..."`)
+ - Backlog views to allow the user to see predefined "slices" of the backlog. These should be defined inside the `backlog` tag.
+    ```json
+    view "Changed Since 08 Apr 2024" query=r#"
+        [System.ChangedDate] >= '2024-04-08T00:00:00.0000000'
+    "#
+    view "Sprint 3 (Previous)" query=r#"
+        [System.IterationPath] = @currentIteration('[Vandewiele]\Vandewiele Team <id:6ae09c99-d9f7-48c9-9c62-cc518e22f096>') - 1
+    "#
+    view "Sprint 4 (Current)" query=r#"
+        [System.IterationPath] = @currentIteration('[Vandewiele]\Vandewiele Team <id:6ae09c99-d9f7-48c9-9c62-cc518e22f096>')
+    "#
+    view "Sprint 5 (Next - Pre-planning)" query=r#"
+        [System.IterationPath] = @currentIteration('[Vandewiele]\Vandewiele Team <id:6ae09c99-d9f7-48c9-9c62-cc518e22f096>') + 1
+    "#
+    ```
+    The same query facilities (id, name, wiql) are available here as they are on the backlog level.
+
+    **Note** For raw WIQL queries, it is recommended to use the raw string syntax (`r#"..."#`) which alleviates the need for escaping characters and supports multi-line strings.
+
+    **Tip** If the WIQL query is used on both the Backlog and the View, the View query will also apply the same conditions as the backlog does, in addition to whatever specific conditions the view has.
+
+### Changed
+ - Renamed the old property `query` from the `backlog` tag to `query-id`
 
 ### Fixed
 
- - Fixed: toc grid size overflow when work items have long titles
+ - TOC grid size overflow when work items have long titles
 
 
 ## [0.1.0] - 2024-04-12

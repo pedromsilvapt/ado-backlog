@@ -3,7 +3,6 @@ import { AzureClient } from '../common/azure';
 import { BacklogContentConfig, TfsConfig } from '../common/config';
 import { Command } from './command';
 import yargs from 'yargs';
-import { PDFFormat } from '../common/formats/pdf';
 import { Exporter } from '../common/exporters/exporter';
 import { HTMLExporter } from '../common/exporters/html';
 import { JsonExporter } from '../common/exporters/json';
@@ -62,7 +61,9 @@ export class DownloadCommand extends Command {
             return;
         }
 
-        const queryResults = await azure.executeQuery(project, backlogConfig.query);
+        this.logger.info(pp`Downloading backlog content workitems...`);
+
+        const queryResults = await azure.getQueryWorkItems(project, backlogConfig);
 
         let content: BacklogContentConfig[] = backlogConfig.content;
 
@@ -77,10 +78,35 @@ export class DownloadCommand extends Command {
 
         const workItemStateColors = await azure.getWorkItemStates(project.name!);
 
-        const backlog = new Backlog(workItemTypes, workItemStateColors, backlogConfig, this.config.toc, this.config.workItems, tree);
+        const views: Record<string, number[]> = {};
+
+        for (const view of backlogConfig.views) {
+            if (view.name in views) {
+                this.logger.error(pp`Duplicate view with name ${view.name} found in config, skipping it.`);
+                continue;
+            }
+
+            this.logger.info(pp`Downloading query results for view ${view.name}...`);
+
+            // When both the backlog and the view are retrieved using a WIQL
+            // query directly in the code, we combine both queries for the view
+            if (backlogConfig.query != null && view.query != null) {
+                // NOTE: Concatenate the view query first, and only then the backlog query,
+                // to allow the backlog query to have additional clauses (such as ORDER BY)
+                views[view.name] = await azure.getQueryResults(project, {
+                    query: `(${view.query.trim()}) AND ${backlogConfig.query.trim()}`
+                });
+            } else {
+                views[view.name] = await azure.getQueryResults(project, view);
+            }
+        }
+
+        const backlog = new Backlog(workItemTypes, workItemStateColors, backlogConfig, this.config.toc, this.config.workItems, tree, views);
 
         // const exporter: Exporter = new JsonExporter(backlog, workItemTypes, tree, this.config.templates);
         const exporter: Exporter = new HTMLExporter(this.logger, azure, backlog, this.config.templates);
+
+        this.logger.info(pp`Rendering output into ${args.output}...`);
 
         await exporter.run(args.output, {
             overwrite: args.overwrite
