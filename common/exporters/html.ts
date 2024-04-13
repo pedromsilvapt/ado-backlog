@@ -870,6 +870,7 @@ table.data-grid tr td, table.data-grid tr th {
     text-overflow: ellipsis;
     white-space: nowrap;
     padding: 3px 5px;
+    max-width: 0;
 }
 
 table.data-grid tr td.level-0 {
