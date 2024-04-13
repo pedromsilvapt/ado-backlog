@@ -100,7 +100,9 @@ export class HTMLExporter extends Exporter {
                         // TODO Test src http if it matches TFS url
                         var imageStream = await this.azure.downloadAttachmentUrlBase64(src);
 
-                        dom(imgElem).attr('src', imageStream);
+                        if (imageStream != null) {
+                            dom(imgElem).attr('src', imageStream);
+                        }
                     }
                 }
 
