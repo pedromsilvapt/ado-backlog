@@ -195,12 +195,6 @@ export class HTMLExporter extends Exporter {
             buffer.push(`<h1>Table of Contents</h1>\n`);
         }
 
-        // buffer.push(`
-        // <p style="text-align: right; margin: 0; margin-bottom: 5px;">
-        //     <a data-grid-action="collapse-all" data-grid-selector="#toc-grid" style="cursor: pointer">Collapse All</a>
-        //     <a data-grid-action="expand-all" data-grid-selector="#toc-grid" style="cursor: pointer">Expand All</a>
-        // </p>`);
-
         buffer.push(`<table id="toc-grid" class="data-grid collapsible-data-grid">
             <thead>
                 <tr>
