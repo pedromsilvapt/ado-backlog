@@ -61,6 +61,16 @@ export class BacklogContentConfig {
 
     @Optional() @Children('content', BacklogContentConfig)
     content!: BacklogContentConfig[];
+
+    public * allWorkItemTypes() : IterableIterator<string> {
+        yield * this.workItemTypes;
+
+        if (this.content != null) {
+            for (const content of this.content) {
+                yield * content.allWorkItemTypes();
+            }
+        }
+    }
 }
 
 export class BacklogConfig {
@@ -75,6 +85,12 @@ export class BacklogConfig {
 
     @Children('content', BacklogContentConfig)
     content!: BacklogContentConfig[];
+
+    public * allWorkItemTypes() : IterableIterator<string> {
+        for (const content of this.content) {
+            yield * content.allWorkItemTypes();
+        }
+    }
 }
 
 export class TableOfContentsValueConfig {
@@ -87,8 +103,11 @@ export class TableOfContentsValueConfig {
     @Property("header", String)
     header!: string;
 
-    @Property("field", String)
-    field!: string;
+    @Optional() @Property("field", String)
+    field?: string;
+
+    @Optional() @Child("workItems", SchemaUtils.schemaOf(Values(0, String)))
+    workItems?: string[];
 }
 
 export enum TableCellAlignment {
@@ -111,6 +130,16 @@ export class TableOfContentsConfig {
 
     @Children("value", TableOfContentsValueConfig)
     values!: TableOfContentsValueConfig[];
+
+    * valuesFor(workItemType: string) {
+        for (const value of this.values) {
+            // If this is a conditional value based on the WorkItem type,
+            // and this is not one of those work item types, then skip it
+            if (value.workItems == null || value.workItems.length == 0 || value.workItems.includes(workItemType)) {
+                yield value;
+            }
+        }
+    }
 }
 
 const BlockConfigTags: Record<string, any> = {}

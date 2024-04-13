@@ -15,7 +15,14 @@ export class Backlog {
     public workItems: BacklogWorkItem[];
     public backlogIndex: Record<number, BacklogWorkItem>;
 
-    public constructor(workItemTypes: BacklogWorkItemType[], workItemStateColors: BacklogWorkItemStateColors, backlogConfig: BacklogConfig, tocConfig: TableOfContentsConfig, workItemTypesConfig: WorkItemsConfig | undefined, workItems: BacklogWorkItem[]) {
+    public constructor(
+        workItemTypes: BacklogWorkItemType[],
+        workItemStateColors: BacklogWorkItemStateColors,
+        backlogConfig: BacklogConfig,
+        tocConfig: TableOfContentsConfig,
+        workItemTypesConfig: WorkItemsConfig | undefined,
+        workItems: BacklogWorkItem[]
+    ) {
         this.config = backlogConfig;
         this.toc = tocConfig;
         this.workItemTypesConfig = workItemTypesConfig;

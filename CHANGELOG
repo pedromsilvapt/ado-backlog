@@ -17,7 +17,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
         }
     }
     ```
- - fix: toc grid size overflow when work items have long titles
+ - Added work-item specific columns for the table of contents. **Note** The number of columns for all work item types must be the same!
+    ```json
+    value width="90px"  header="State" field="System.State"
+    // For the story points, omit the field for Epic and Feature work items, so the column is empty
+    value width="60px" header="Story Points" { workItems "Epic" "Feature"; }
+    value width="60px" header="Story Points" field="Microsoft.VSTS.Scheduling.StoryPoints" align="right" { workItems "User Story" "Bug"; }
+    value width="200px" header="Value Area" field="Microsoft.VSTS.Common.ValueArea"
+    ```
+
+### Fixed
+
+ - Fixed: toc grid size overflow when work items have long titles
+
 
 ## [0.1.0] - 2024-04-12
 

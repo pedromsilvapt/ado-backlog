@@ -6,6 +6,7 @@ import { TableCellAlignment, TableOfContentsMode, TemplateBlockConfig, TemplateC
 import * as he from 'he';
 import * as cheerio from 'cheerio';
 import * as luxon from 'luxon';
+import { pp } from 'clui-logger';
 
 export class HTMLExporter extends Exporter {
     protected turndownService = new TurndownService();
@@ -145,6 +146,49 @@ export class HTMLExporter extends Exporter {
     protected async exportTableOfContentsDataGrid(buffer: string[]) {
         const tocConfig = this.backlog.toc;
 
+        const contentWorkItemTypes = Array.from(this.backlog.config.allWorkItemTypes());
+
+        // If there is no content defined, there is no table of contents
+        if (contentWorkItemTypes.length == 0) {
+            return;
+        }
+
+        // Validate TOC columns configuration
+        const columnVariations: TableOfContentsValuesValidation[] = [];
+
+        // Create a list of, for each work item type, the column's headers and sizes
+        for (const workItemType of contentWorkItemTypes) {
+            const workItemColumns: TableOfContentsValuesValidation = {
+                workItemType: workItemType,
+                headers: [],
+                sizes: [],
+            };
+
+            for (const value of tocConfig.valuesFor(workItemType)) {
+                workItemColumns.headers.push(value.header);
+                workItemColumns.sizes.push(value.width);
+            }
+
+            columnVariations.push(workItemColumns);
+        }
+
+        // Validate if, for all work item types, the list of columns:
+        //  - has the same number of columns (by counting the headers)
+        //  - has the same sizes (by comparing their values)
+        for (let i = 1; i < columnVariations.length; i++) {
+            if (columnVariations[0].headers.length != columnVariations[i].headers.length) {
+                this.logger.error(pp`Work item ${columnVariations[i].workItemType} has different number of columns than work item type ${columnVariations[0].workItemType}\n`
+                    + ` - ${columnVariations[i].workItemType}: ${columnVariations[i].headers}\n`
+                    + ` - ${columnVariations[0].workItemType}: ${columnVariations[0].headers}`);
+            }
+
+            if (columnVariations[0].sizes.some((s, si) => s != columnVariations[i].sizes[si])) {
+                this.logger.error(pp`Work item ${columnVariations[i].workItemType} has different column sizes than work item type ${columnVariations[0].workItemType}\n`
+                    + ` - ${columnVariations[i].workItemType}: ${columnVariations[i].sizes}\n`
+                    + ` - ${columnVariations[0].workItemType}: ${columnVariations[0].sizes}`);
+            }
+        }
+
         buffer.push(`<nav id="toc">`);
 
         if (!tocConfig.hideHeader) {
@@ -166,7 +210,8 @@ export class HTMLExporter extends Exporter {
                         Title
                     </th>\n`);
 
-        for (const value of tocConfig.values) {
+        // For the headers, we take information from the first work item type defined in the backlog
+        for (const value of tocConfig.valuesFor(contentWorkItemTypes[0])) {
             buffer.push(`<th title=${JSON.stringify(value.header)} style="width: ${value.width ?? 'auto'}; max-width: ${value.width ?? 'auto'};">${value.header}</th>`);
         }
 
@@ -196,10 +241,14 @@ export class HTMLExporter extends Exporter {
                     </td>
                 `);
 
-
-                for (const value of tocConfig.values) {
+                for (const value of tocConfig.valuesFor(workItemType.name)) {
                     buffer.push(`<td style="text-align: ${value.align ?? TableCellAlignment.Left}">`);
-                    await this.exportWorkItemField(buffer, wi, value.field, false);
+
+                    // Only print the value of this column if there is a field name. Otherwise, print it as empty
+                    if (value.field != null) {
+                        await this.exportWorkItemField(buffer, wi, value.field, false);
+                    }
+
                     buffer.push(`</td>`);
                 }
 
@@ -491,6 +540,12 @@ export class HTMLExporter extends Exporter {
 
 export interface BlockRenderOptions {
     inline?: boolean;
+}
+
+export interface TableOfContentsValuesValidation {
+    workItemType: string;
+    headers: string[];
+    sizes: (string | undefined)[];
 }
 
 const HTMLScript = `
