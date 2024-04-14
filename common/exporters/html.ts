@@ -48,6 +48,8 @@ export class HTMLExporter extends Exporter {
 
         await this.backlog.visitAsync(wi => this.exportWorkItem(buffer, wi));
 
+        await this.exportBackToTop(buffer);
+
         await this.exportFooter(buffer);
 
         buffer.push(`</div>`);
@@ -57,6 +59,8 @@ export class HTMLExporter extends Exporter {
         buffer.push(`
         </body>
         </html>`);
+
+        this.logger.info(pp`Writing to file ${output}`);
 
         await fs.writeFile(output, buffer.join(''), { encoding: 'utf8' });
     }
@@ -332,6 +336,18 @@ export class HTMLExporter extends Exporter {
         </nav>\n`);
 
         buffer.push(`</div>`);
+    }
+
+    protected async exportBackToTop(buffer: string[]) {
+        buffer.push(`<a id="back-to-top" href="#top">
+            <svg fill="#000000" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" style="
+            width: 45px;
+            height: 45px;
+            ">
+                <g id="SVGRepo_bgCarrier" stroke-width="0"></g><g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"></g>
+                <g id="SVGRepo_iconCarrier"><path d="M5 21h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2zm7-14 5 5h-4v5h-2v-5H7l5-5z"></path></g>
+            </svg>
+        </a>\n`);
     }
 
     protected async exportFooter(buffer: string[]) {
@@ -1205,6 +1221,19 @@ table.data-grid tr td .state-indicator {
 
 .view-workitem-faded {
     opacity: 0.3;
+}
+
+a#back-to-top {
+    position: fixed;
+    bottom: 10px;
+    right: 20px;
+    opacity: 0.1;
+    transition: opacity ease-in-out 0.25s;
+    cursor: pointer;
+}
+
+a#back-to-top:hover {
+    opacity: 0.5;
 }
 `;
 

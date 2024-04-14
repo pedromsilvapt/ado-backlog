@@ -45,7 +45,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
     **Note** For raw WIQL queries, it is recommended to use the raw string syntax (`r#"..."#`) which alleviates the need for escaping characters and supports multi-line strings.
 
-    **Tip** If the WIQL query is used on both the Backlog and the View, the View query will also apply the same conditions as the backlog does, in addition to whatever specific conditions the view has.
+    **Tip** If the WIQL query is used on both the Backlog and the View, the View query will also apply the same conditions as the backlog does, in addition to whatever specific conditions the view has. To get the WIQL string, you can build a query in TFS and then click the button **Edit WIQL**
+ - Back to top button on the bottom right corner of the screen
 
 ### Changed
  - Renamed the old property `query` from the `backlog` tag to `query-id`
