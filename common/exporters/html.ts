@@ -89,7 +89,9 @@ export class HTMLExporter extends Exporter {
             if (field == 'System.State') {
                 const color = this.backlog.workItemStateColors[workItem.type][value];
 
-                buffer.push(`<span class="state-indicator" style="background-color: #${color}"></span> ${value}`);
+                const escapedValue = he.encode(value);
+
+                buffer.push(`<span title="${escapedValue}"><span class="state-indicator" style="background-color: #${color}"></span> ${escapedValue}</span>`);
             } else if (field == 'System.ChangedDate') {
                 var date = new Date(value);
 
@@ -115,7 +117,10 @@ export class HTMLExporter extends Exporter {
 
                 buffer.push(dom.html());
             } else if (typeof value === 'string') {
-                buffer.push(he.encode(value));
+                const escapedValue = he.encode(value);
+                const escapedValueSingleLine = escapedValue.replace('\n', '');
+
+                buffer.push(`<span title=${JSON.stringify(escapedValueSingleLine)}>${escapedValue}</span>\n`);
             } else {
                 buffer.push(value ?? '');
             }
