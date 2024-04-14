@@ -48,6 +48,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
     **Tip** If the WIQL query is used on both the Backlog and the View, the View query will also apply the same conditions as the backlog does, in addition to whatever specific conditions the view has. To get the WIQL string, you can build a query in TFS and then click the button **Edit WIQL**
  - Back to top button on the bottom right corner of the screen
+ - Optional `--config`/`-c` to specify a config file path different from the default `config.kdl`. This allows to have multiple config files for different backlogs, and choose which one to export.
 
 ### Changed
  - Renamed the old property `query` from the `backlog` tag to `query-id`

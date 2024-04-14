@@ -35,21 +35,31 @@ export class DownloadCommand extends Command {
             type: 'string',
             default: './out'
         });
+
+        yargs.option('config', {
+            alias: 'c',
+            describe: 'output folder to write the contents to',
+            type: 'string',
+            default: './config.kdl'
+        });
     }
 
     async run (args: DownloadCommandOptions): Promise<void> {
+        const config = this.config!;
+        const logger = this.logger!;
+
         // Configure Azure Client
-        const azure = new AzureClient(this.logger.service('tfs'), this.config);
+        const azure = new AzureClient(logger.service('tfs'), config);
 
         const backlogConfig = args.backlog
-            ? this.config.backlogs.find(b => b.name == args.backlog)
-            : this.config.backlogs[0];
+            ? config.backlogs.find(b => b.name == args.backlog)
+            : config.backlogs[0];
 
         if (backlogConfig == null) {
             if (args.backlog) {
-                this.logger.error(pp`No backlog found in the configuration file named ${args.backlog}`);
+                logger.error(pp`No backlog found in the configuration file named ${args.backlog}`);
             } else {
-                this.logger.error(`No backlog was found in the configuration file!`);
+                logger.error(`No backlog was found in the configuration file!`);
             }
             return;
         }
@@ -57,18 +67,18 @@ export class DownloadCommand extends Command {
         const project = await azure.getProjectByName(backlogConfig.project);
 
         if (project == null) {
-            this.logger.error(pp`No project found in the TFS named ${backlogConfig.project}`);
+            logger.error(pp`No project found in the TFS named ${backlogConfig.project}`);
             return;
         }
 
-        this.logger.info(pp`Downloading backlog content workitems...`);
+        logger.info(pp`Downloading backlog content workitems...`);
 
         const queryResults = await azure.getQueryWorkItems(project, backlogConfig);
 
         let content: BacklogContentConfig[] = backlogConfig.content;
 
         if (content == null) {
-            this.logger.error(pp`Backlog has no content (work item types) defined in the configuration.`);
+            logger.error(pp`Backlog has no content (work item types) defined in the configuration.`);
             return;
         }
 
@@ -82,11 +92,11 @@ export class DownloadCommand extends Command {
 
         for (const view of backlogConfig.views) {
             if (view.name in views) {
-                this.logger.error(pp`Duplicate view with name ${view.name} found in config, skipping it.`);
+                logger.error(pp`Duplicate view with name ${view.name} found in config, skipping it.`);
                 continue;
             }
 
-            this.logger.info(pp`Downloading query results for view ${view.name}...`);
+            logger.info(pp`Downloading query results for view ${view.name}...`);
 
             // When both the backlog and the view are retrieved using a WIQL
             // query directly in the code, we combine both queries for the view
@@ -101,12 +111,12 @@ export class DownloadCommand extends Command {
             }
         }
 
-        const backlog = new Backlog(workItemTypes, workItemStateColors, backlogConfig, this.config.toc, this.config.workItems, tree, views);
+        const backlog = new Backlog(workItemTypes, workItemStateColors, backlogConfig, config.toc, config.workItems, tree, views);
 
-        // const exporter: Exporter = new JsonExporter(backlog, workItemTypes, tree, this.config.templates);
-        const exporter: Exporter = new HTMLExporter(this.logger, azure, backlog, this.config.templates);
+        // const exporter: Exporter = new JsonExporter(backlog, workItemTypes, tree, config.templates);
+        const exporter: Exporter = new HTMLExporter(logger, azure, backlog, config.templates);
 
-        this.logger.info(pp`Rendering output into ${args.output}...`);
+        logger.info(pp`Rendering output into ${args.output}...`);
 
         await exporter.run(args.output, {
             overwrite: args.overwrite
