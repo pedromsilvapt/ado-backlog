@@ -194,10 +194,18 @@ export class AzureClient {
 
         const witApi = await this.connection.getWorkItemTrackingApi();
 
-        return this.buildContentListRecursive(witApi, queryResults, content);
+        const unincludedWorkItems = new Set<number>();
+
+        const backlog = await this.buildContentListRecursive(witApi, queryResults, content, unincludedWorkItems);
+
+        if (unincludedWorkItems.size > 0) {
+            this.logger.info(pp`List of unparented Work Items: ${Array.from(unincludedWorkItems).join(', ')}`)
+        }
+
+        return backlog;
     }
 
-    public async buildContentListRecursive(witApi: IWorkItemTrackingApi, queryResults: WorkItem[], contentList: BacklogContentConfig[]): Promise<BacklogWorkItem[]> {
+    public async buildContentListRecursive(witApi: IWorkItemTrackingApi, queryResults: WorkItem[], contentList: BacklogContentConfig[], unincludedWorkItems: Set<number>): Promise<BacklogWorkItem[]> {
         if (contentList.length === 0) {
             throw new Error("Cannot build content without an work item types hierarchy.");
         }
@@ -205,13 +213,13 @@ export class AzureClient {
         const backlog = [];
 
         for (const content of contentList) {
-            backlog.push(...await this.buildContentRecursive(witApi, queryResults, content));
+            backlog.push(...await this.buildContentRecursive(witApi, queryResults, content, unincludedWorkItems));
         }
 
         return backlog;
     }
 
-    public async buildContentRecursive(witApi: IWorkItemTrackingApi, queryResults: WorkItem[], content: BacklogContentConfig): Promise<BacklogWorkItem[]> {
+    public async buildContentRecursive(witApi: IWorkItemTrackingApi, queryResults: WorkItem[], content: BacklogContentConfig, unincludedWorkItems: Set<number>): Promise<BacklogWorkItem[]> {
         const hasChildren = content.content != null && content.content.length > 0;
 
         const parentTypes = content.workItemTypes;
@@ -226,7 +234,7 @@ export class AzureClient {
                 parentsById.set(parent.id, parent);
             }
 
-            const childrenBacklog = await this.buildContentListRecursive(witApi, queryResults, content.content);
+            const childrenBacklog = await this.buildContentListRecursive(witApi, queryResults, content.content, unincludedWorkItems);
             for (const child of childrenBacklog) {
                 let parentId: number | null = null;
 
@@ -248,6 +256,7 @@ export class AzureClient {
 
                 if (parent == null) {
                     this.logger.warn(child.type + pp` #${child.id} ${child.title} was skipped because its parent #${parentId} is not part of this backlog.`);
+                    unincludedWorkItems.add(parentId);
                     continue;
                 }
 
