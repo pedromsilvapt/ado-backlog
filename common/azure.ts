@@ -264,65 +264,8 @@ export class AzureClient {
             }
         }
 
-        // if (content.sort != null) {
-
-        //     content.sort.field
-        // }
-
         return parentWorkItems;
     }
-
-    //     const backlogByLevel = new Map<number, BacklogWorkItem[]>();
-
-    //     const leafTypes = workItemTypes[workItemTypes.length - 1];
-    //     const leafWorkItems = queryResults
-    //         .filter(wi => leafTypes.includes(wi.fields!["System.WorkItemType"]))
-    //         .map(wi => new BacklogWorkItem(wi, false));
-
-    //         backlogByLevel.set(workItemTypes.length - 1, leafWorkItems);
-
-    //     for (let i = workItemTypes.length - 2; i >= 0; i--) {
-    //         const childLevel = i + 1;
-
-    //         const childWorkItems = backlogByLevel.get(childLevel)!;
-
-    //         const parentIdsSet = new Set<number>();
-    //         for (const wi of childWorkItems) {
-    //             for (const rel of wi.workItem.relations!) {
-    //                 if (rel.attributes!.name !== "Parent") {
-    //                     continue;
-    //                 }
-
-    //                 const parentId = BacklogWorkItem.getIdFromUrl(rel.url!);
-    //                 parentIdsSet.add(parentId);
-    //             }
-    //         }
-
-    //         const parentWorkItems = (await this.getWorkItemsById(Array.from(parentIdsSet)))
-    //             .map(wi => new BacklogWorkItem(wi, true));
-
-    //             backlogByLevel.set(i, parentWorkItems);
-
-    //         const parentsById = new Map<number, BacklogWorkItem>(parentWorkItems.map(wi => [wi.workItem.id!, wi] as const));
-
-    //         for (const wi of childWorkItems) {
-    //             for (const rel of wi.workItem.relations!) {
-    //                 if (rel.attributes!.name !== "Parent") {
-    //                     continue;
-    //                 }
-
-    //                 const parentId = BacklogWorkItem.getIdFromUrl(rel.url!);
-
-    //                 parentsById.get(parentId)?.children.push(wi);
-    //             }
-    //         }
-    //     }
-
-    //     // const rootType = workItemTypes[0][ 0 ];
-    //     const rootWorkItems = backlogByLevel.get(0)!;
-
-    //     return rootWorkItems;
-    // }
 
     public async getWorkItemTypes(projectId: string): Promise<BacklogWorkItemType[]> {
         const witApi = await this.connection.getWorkItemTrackingApi();
