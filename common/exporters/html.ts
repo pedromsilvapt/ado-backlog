@@ -68,8 +68,6 @@ export class HTMLExporter extends Exporter {
         </body>
         </html>`);
 
-        this.logger.info(pp`Writing to file ${output}`);
-
         await fs.writeFile(output, buffer.join(''), { encoding: 'utf8' });
     }
 

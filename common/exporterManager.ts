@@ -55,7 +55,6 @@ export class ExporterManager {
     }
 
     public async run(output: string, format?: string, options?: ExporterOptions) {
-        for (const exporter of this.formats) {
             const exporter = this.findExporter(output, format);
 
             if (exporter == null) {
@@ -68,9 +67,8 @@ export class ExporterManager {
                 return;
             }
 
-            this.logger.debug(pp`Exporting to ${output} with exporter ${exporter.name}`);
+        this.logger.info(pp`Exporting to ${output} with exporter ${exporter.name}`);
             await exporter.run(output, options);
-        }
     }
 }
 
