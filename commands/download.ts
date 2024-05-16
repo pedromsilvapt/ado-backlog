@@ -56,12 +56,14 @@ export class DownloadCommand extends Command {
 
         let errorFound = false;
 
-        if (!args.backlogs || args.backlogs.length == 0) {
+        const backlogArgs = args.backlogs?.filter(name => name != null);
+
+        if (!backlogArgs || backlogArgs.length == 0) {
             configs = this.config!.backlogs;
         } else {
             configs = [];
 
-            for (const backlog of args.backlogs) {
+            for (const backlog of backlogArgs) {
                 const backlogConfig = this.config!.backlogs.find(b => b.name == backlog);
     
                 if (backlogConfig == null) {
