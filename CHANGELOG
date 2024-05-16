@@ -7,7 +7,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ## Unreleased
 
 ### Added
- - Allow adding multiple outputs directly on the config file, per backlog
+ - Multiple outputs directly on the config file, per backlog
+    ```json
+    output "_archive/{{it.backlogConfig.name}}-{{it.now | format('yyyyMMdd')}}.html" mkdir=true
+    output "{{it.backlogConfig.name}}.html" overwrite=true
+    ```
+    Most commonly, the format to use is derived from the file extension. Additionally each output may contain an optional `format="<format_name>"` to override which format to use.
+    Supported formats currently are `html` (standard), `json` (mostly useful for debugging, since it contains the raw data about the work items, including all fields) or `md` (incomplete).
+
+    Additionally, the output supports template tokens (implemented using [SquirrellyJS](https://squirrelly.js.org/))named:
+     - `backlogConfig` gives access to the properties of this backlog's configuration
+     - `now` gives a date time object which can be used in conjunction with the `format` filter (which uses the [luxon formating syntax](https://moment.github.io/luxon/#/formatting?id=table-of-tokens)).
+    
 
 ## [0.2.0] - 2024-04-14
 
