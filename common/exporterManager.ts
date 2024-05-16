@@ -36,7 +36,8 @@ export class ExporterManager {
     
     public interpolate(outputTemplate: string): string {
         return Sqrl.render(outputTemplate, {
-            backlogConfig: this.backlogConfig
+            backlogConfig: this.backlogConfig,
+            now: DateTime.now(),
         });
     }
 
@@ -55,20 +56,20 @@ export class ExporterManager {
     }
 
     public async run(output: string, format?: string, options?: ExporterOptions) {
-            const exporter = this.findExporter(output, format);
+        const exporter = this.findExporter(output, format);
 
-            if (exporter == null) {
-                if (format != null) {
-                    this.logger.error(pp`No exporter found for output format ${format}`);
-                } else {
-                    this.logger.error(pp`No exporter found for output ${output}`);
-                }
-
-                return;
+        if (exporter == null) {
+            if (format != null) {
+                this.logger.error(pp`No exporter found for output format ${format}`);
+            } else {
+                this.logger.error(pp`No exporter found for output ${output}`);
             }
 
+            return;
+        }
+
         this.logger.info(pp`Exporting to ${output} with exporter ${exporter.name}`);
-            await exporter.run(output, options);
+        await exporter.run(output, options);
     }
 }
 
@@ -76,6 +77,6 @@ export interface ExporterClass {
     new(logger: LoggerInterface, azure : AzureClient, backlog: Backlog, templates: TemplateConfig[]): Exporter;
 }
 
-Sqrl.filters.define('format', (format: string) => {
-    return DateTime.now().toFormat(format);
+Sqrl.filters.define('format', (date: DateTime, format: string) => {
+    return date.toFormat(format);
 });
