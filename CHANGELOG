@@ -18,7 +18,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
     Additionally, the output supports template tokens (implemented using [SquirrellyJS](https://squirrelly.js.org/))named:
      - `backlogConfig` gives access to the properties of this backlog's configuration
      - `now` gives a date time object which can be used in conjunction with the `format` filter (which uses the [luxon formating syntax](https://moment.github.io/luxon/#/formatting?id=table-of-tokens)).
-    
+ - Multiple backlog names can now be provided in a single `download` command execution:
+    ```bash
+    node cli.js download Phase1 Phase2
+    ```
+   **Breaking Change** The `backlogs` argument is optional, and when not provided in the command, all backlogs present in the configuration file are downloaded sequentially, a change from the old behavior of downloading the first configured backlog only.
 
 ## [0.2.0] - 2024-04-14
 
