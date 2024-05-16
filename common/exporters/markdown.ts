@@ -6,7 +6,15 @@ import sanitizeFilename from 'sanitize-filename';
 import TurndownService from 'turndown';
 
 export class MarkdownExporter extends Exporter {
+    public readonly name: string = 'markdown';
+
     protected turndownService = new TurndownService();
+
+    public accepts(output: string): boolean {
+        const outputLower = output.toLowerCase();
+
+        return outputLower.endsWith('.md');
+    }
 
     public async run (folder: string, options: ExporterOptions = {}): Promise<void> {
         if (folder == null) {

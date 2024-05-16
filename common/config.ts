@@ -87,6 +87,18 @@ export class BacklogViewConfig {
     queryName?: string;
 }
 
+export class BacklogOutputConfig {
+    public constructor(path?: string) {
+        this.path = path!;
+    }
+    
+    @Value(0, String)
+    path!: string;
+
+    @Optional() @Property("format", String)
+    format?: string;
+}
+
 export class BacklogConfig {
     @Value(0, String)
     name!: string;
@@ -108,6 +120,9 @@ export class BacklogConfig {
 
     @Optional() @Children('view', BacklogViewConfig)
     views!: BacklogViewConfig[];
+
+    @Children('output', BacklogOutputConfig)
+    outputs!: BacklogOutputConfig[];
 
     public * allWorkItemTypes() : IterableIterator<string> {
         for (const content of this.content) {

@@ -1,12 +1,12 @@
 import { LoggerInterface, SharedLoggerInterface, pp } from 'clui-logger';
 import { AzureClient } from '../common/azure';
-import { BacklogContentConfig, TfsConfig } from '../common/config';
+import { BacklogContentConfig, BacklogOutputConfig, TfsConfig } from '../common/config';
 import { Command } from './command';
 import yargs from 'yargs';
-import { Exporter } from '../common/exporters/exporter';
 import { HTMLExporter } from '../common/exporters/html';
 import { JsonExporter } from '../common/exporters/json';
 import { Backlog } from '../common/model';
+import { ExporterManager } from '../common/exporterManager';
 
 export class DownloadCommand extends Command {
     static description = 'Download the backlog as file(s) into the hard-drive';
@@ -15,7 +15,7 @@ export class DownloadCommand extends Command {
 
     public readonly usage: string = "download [backlog]";
 
-    public configure (yargs: yargs.Argv<{}>): void {
+    public configure(yargs: yargs.Argv<{}>): void {
         yargs.positional('name', {
             type: 'string',
             default: null,
@@ -33,7 +33,6 @@ export class DownloadCommand extends Command {
             alias: 'o',
             describe: 'output folder to write the contents to',
             type: 'string',
-            default: './out'
         });
 
         yargs.option('config', {
@@ -44,7 +43,7 @@ export class DownloadCommand extends Command {
         });
     }
 
-    async run (args: DownloadCommandOptions): Promise<void> {
+    async run(args: DownloadCommandOptions): Promise<void> {
         const config = this.config!;
         const logger = this.logger!;
 
@@ -111,30 +110,40 @@ export class DownloadCommand extends Command {
             }
         }
 
+        let outputConfigs = args.output != null
+            ? [new BacklogOutputConfig(args.output)]
+            : backlogConfig.outputs;
+
+        // Boolean flag which indicates if the output we will be using is the default provided one. Used to print a message in such cases,
+        // Informing the user that the default output is being used, and that they can use custom outputs.
+        let isDefaultOutput = false;
+
+        // The default output is an HTML file on the current working directory with the name of the backlog
+        if (outputConfigs == null || outputConfigs.length == 0) {
+            outputConfigs = [new BacklogOutputConfig('{{it.backlogConfig.name}}.html')];
+
+            isDefaultOutput = true;
+        }
+
         const backlog = new Backlog(workItemTypes, workItemStateColors, backlogConfig, config.toc, config.workItems, tree, views);
 
-        // const exporter: Exporter = new JsonExporter(backlog, workItemTypes, tree, config.templates);
-        const exporter: Exporter = new HTMLExporter(logger, azure, backlog, config.templates);
+        const exporter = new ExporterManager(logger, azure, backlog, backlogConfig, config.templates);
+        exporter.addFormat(HTMLExporter);
+        exporter.addFormat(JsonExporter);
+        exporter.addFormat(HTMLExporter);
 
-        logger.info(pp`Rendering output into ${args.output}...`);
+        for (const outputConfig of outputConfigs) {
+            const output = exporter.interpolate(outputConfig.path);
 
-        await exporter.run(args.output, {
-            overwrite: args.overwrite
-        });
+            if (isDefaultOutput) {
+                logger.info(pp`No outputs configured for backlog ${backlogConfig.name}, using ${output} as a default.`);
+            }
+
+            await exporter.run(output, outputConfig.format, {
+                overwrite: args.overwrite
+            });
+        }
     }
-
-    // public static define( yargv : yargs.Argv ) : yargs.Argv {
-    //     return yargv.command( 'download', 'download [backlog]', (yargs) => {
-    //         yargs.positional('name', {
-    //           type: 'string',
-    //           default: null,
-    //           describe: 'name of backlog defined in config file, to download (if empty, download first one)',
-    //           demandOption: false
-    //         });
-    //     }, function (argv) {
-    //         console.log('hello', argv.name, 'welcome to yargs!')
-    //     } );
-    // }
 }
 
 export interface DownloadCommandOptions {

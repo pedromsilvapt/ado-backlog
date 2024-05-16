@@ -4,6 +4,8 @@ import { Backlog, BacklogWorkItem, BacklogWorkItemType } from '../model';
 import { AzureClient } from '../azure';
 
 export abstract class Exporter {
+    public abstract readonly name: string;
+    
     public logger: LoggerInterface;
 
     public azure: AzureClient;
@@ -18,6 +20,8 @@ export abstract class Exporter {
         this.backlog = backlog;
         this.templates = templates;
     }
+
+    public abstract accepts(output: string): boolean;
 
     public abstract run(output: string, options?: ExporterOptions): Promise<void>;
 }

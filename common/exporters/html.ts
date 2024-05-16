@@ -9,7 +9,15 @@ import * as luxon from 'luxon';
 import { pp } from 'clui-logger';
 
 export class HTMLExporter extends Exporter {
+    public readonly name: string = 'html';
+
     protected turndownService = new TurndownService();
+
+    public accepts(output: string): boolean {
+        const outputLower = output.toLowerCase();
+
+        return outputLower.endsWith('.html') || outputLower.endsWith('.htm');
+    }
 
     public async run(output: string, options: ExporterOptions = {}): Promise<void> {
         if (output == null) {

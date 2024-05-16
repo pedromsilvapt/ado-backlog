@@ -3,7 +3,15 @@ import * as fs from 'fs/promises';
 import TurndownService from 'turndown';
 
 export class JsonExporter extends Exporter {
+    public readonly name: string = 'json';
+
     protected turndownService = new TurndownService();
+
+    public accepts(output: string): boolean {
+        const outputLower = output.toLowerCase();
+
+        return outputLower.endsWith('.json');
+    }
 
     public async run(file: string, options: ExporterOptions = {}): Promise<void> {
         if (file == null) {
