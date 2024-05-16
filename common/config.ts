@@ -104,6 +104,14 @@ export class BrandConfig {
     logo!: string;
 }
 
+export class BacklogAppendixConfig {
+    @Optional() @Property('title', String)
+    title?: string;
+
+    @Optional() @Value(0, String)
+    content?: string;
+}
+
 export class BacklogConfig {
     @Value(0, String)
     name!: string;
@@ -131,6 +139,9 @@ export class BacklogConfig {
 
     @Children('output', BacklogOutputConfig)
     outputs!: BacklogOutputConfig[];
+
+    @Children('appendix', BacklogAppendixConfig)
+    appendixes!: BacklogAppendixConfig[];
 
     public * allWorkItemTypes() : IterableIterator<string> {
         for (const content of this.content) {

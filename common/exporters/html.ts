@@ -1,15 +1,17 @@
 import { BacklogWorkItem, BacklogWorkItemType } from '../model';
-import * as fs from 'fs/promises';
 import { createReadStream } from 'fs';
-import TurndownService from 'turndown';
 import { Exporter, ExporterOptions } from './exporter';
 import { TableCellAlignment, TableOfContentsMode, TemplateBlockConfig, TemplateConfig, TemplateLinksConfig, TemplateMetadataColumnConfig, TemplateMetadataConfig, TemplateMetadataRowConfig, TemplateSectionConfig, TemplateTagsConfig } from '../config';
+import { streamToBase64 } from '../utils';
+import { pp } from 'clui-logger';
+import TurndownService from 'turndown';
+import marked from 'marked';
+import * as fs from 'fs/promises';
 import * as he from 'he';
 import * as cheerio from 'cheerio';
 import * as luxon from 'luxon';
 import * as path from 'path';
-import { pp } from 'clui-logger';
-import { streamToBase64 } from '../utils';
+
 
 export class HTMLExporter extends Exporter {
     public readonly name: string = 'html';
@@ -60,6 +62,8 @@ export class HTMLExporter extends Exporter {
         buffer.push(`<div class="centered-layout">`);
 
         await this.backlog.visitAsync(wi => this.exportWorkItem(buffer, wi));
+
+        await this.exportAppendixes(buffer);
 
         await this.exportBackToTop(buffer);
 
@@ -370,6 +374,24 @@ export class HTMLExporter extends Exporter {
         </nav>\n`);
 
         buffer.push(`</div>`);
+    }
+
+    protected async exportAppendixes(buffer: string[]) {
+        if (this.backlog.config.appendixes.length > 0) {
+            for (const appendix of this.backlog.config.appendixes) {
+                buffer.push(`<section class="appendix from-markdown">\n`);
+                
+                if (appendix.title != null) {
+                    buffer.push(`<h1>${he.encode(appendix.title)}</h1>\n`);
+                }
+                
+                if (appendix.content != null) {
+                    buffer.push(`${marked.parse(appendix.content)}\n`);
+                }
+
+                buffer.push(`</section>\n`);
+            }
+        }
     }
 
     protected async exportBackToTop(buffer: string[]) {
@@ -1306,6 +1328,15 @@ header h1 {
     height: 30px;
     width: auto;
     border-radius: 0;
+}
+
+section.appendix {
+    margin: 0 0 4rem;
+}
+
+.from-markdown table {
+    table-layout: auto;
+    width: 100%;
 }
 `;
 

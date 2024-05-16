@@ -32,6 +32,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
       - Follow the style of an horizontal banner, with the logo on the left, and the brand name on the right side
       - Have a transparent background (`*.png` format is advised)
       - Be cropped without any empty padding on the image itself (this prevents images with different paddings from looking bigger or smaller)
+ - Add arbitrary markdown-formatted appendixes to the backlog export, such as document version history tables:
+    ```json
+        appendix title="Document Version History" r#"
+|Date|Version|Changes|Authors|
+|:--:|:-----:|-------|-------|
+|2024-05-17|1.0|Document Creation and Approval|Project Manager Name|
+        "#
+    ```
 
 ## [0.2.0] - 2024-04-14
 
