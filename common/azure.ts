@@ -8,31 +8,10 @@ import { BacklogWorkItem, BacklogWorkItemType } from './model';
 import { QueryExpand, QueryHierarchyItem, WorkItem, WorkItemExpand } from 'azure-devops-node-api/interfaces/WorkItemTrackingInterfaces';
 import * as path from 'path';
 import { IWorkItemTrackingApi } from 'azure-devops-node-api/WorkItemTrackingApi';
-
+import { streamToBase64, streamToString } from "./utils";
 
 const DAY_FORMAT = 'yyyyMMdd';
 const SPRINT_FORMAT = 'dd MMM';
-
-function streamToBuffer(stream: NodeJS.ReadableStream) {
-    const chunks: Buffer[] = [];
-    return new Promise<Buffer>((resolve, reject) => {
-        stream.on('data', (chunk) => chunks.push(Buffer.from(chunk)));
-        stream.on('error', (err) => reject(err));
-        stream.on('end', () => resolve(Buffer.concat(chunks)));
-    });
-}
-
-async function streamToString(stream: NodeJS.ReadableStream) {
-    const buffer = await streamToBuffer(stream);
-
-    return buffer.toString('utf-8');
-}
-
-async function streamToBase64(stream: NodeJS.ReadableStream) {
-    const buffer = await streamToBuffer(stream);
-
-    return buffer.toString('base64');
-}
 
 export class AzureClient {
     protected connection: azdev.WebApi;

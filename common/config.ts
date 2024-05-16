@@ -99,6 +99,11 @@ export class BacklogOutputConfig {
     format?: string;
 }
 
+export class BrandConfig {
+    @Value(0, String)
+    logo!: string;
+}
+
 export class BacklogConfig {
     @Value(0, String)
     name!: string;
@@ -114,6 +119,9 @@ export class BacklogConfig {
 
     @Property('project', String)
     project!: string;
+
+    @Children('brand', BrandConfig)
+    brands!: BrandConfig[];
 
     @Children('content', BacklogContentConfig)
     content!: BacklogContentConfig[];

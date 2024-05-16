@@ -1,12 +1,15 @@
 import { BacklogWorkItem, BacklogWorkItemType } from '../model';
 import * as fs from 'fs/promises';
+import { createReadStream } from 'fs';
 import TurndownService from 'turndown';
 import { Exporter, ExporterOptions } from './exporter';
 import { TableCellAlignment, TableOfContentsMode, TemplateBlockConfig, TemplateConfig, TemplateLinksConfig, TemplateMetadataColumnConfig, TemplateMetadataConfig, TemplateMetadataRowConfig, TemplateSectionConfig, TemplateTagsConfig } from '../config';
 import * as he from 'he';
 import * as cheerio from 'cheerio';
 import * as luxon from 'luxon';
+import * as path from 'path';
 import { pp } from 'clui-logger';
+import { streamToBase64 } from '../utils';
 
 export class HTMLExporter extends Exporter {
     public readonly name: string = 'html';
@@ -45,6 +48,8 @@ export class HTMLExporter extends Exporter {
         <style>${HTMLStylesheetAir}</style>
         </head>
         <body>\n`);
+
+        await this.exportBrands(buffer);
 
         await this.exportHeader(buffer);
 
@@ -133,9 +138,27 @@ export class HTMLExporter extends Exporter {
         }
     }
 
+    protected async exportBrands(buffer: string[]) {
+        if (this.backlog.config.brands.length > 0) {
+            buffer.push(`<div class="brands">\n`);
+            
+            for (const brand of this.backlog.config.brands) {
+                const brandStream = createReadStream(brand.logo);
+
+                const base64Brand = `data:image/${path.extname(brand.logo).slice(1)};base64,` + await streamToBase64(brandStream);
+
+                buffer.push(`<div class="brand right">
+                    <img src="${base64Brand}" />
+                </div>`);
+            }
+
+            buffer.push(`</div>\n`);
+        }
+    }
+
     protected async exportHeader(buffer: string[]) {
         buffer.push(`<header id="top">
-        <h1 style="text-align: center">${this.backlog.config.name}</h1>
+        <h1>${this.backlog.config.name}</h1>
         <p style="text-align: center; margin-top: 0;"><small>${luxon.DateTime.now().toFormat("DDDD")}</small></p>
         <p style="text-align: center; margin-top: 0;">`);
 
@@ -152,7 +175,7 @@ export class HTMLExporter extends Exporter {
         const views = this.backlog.config.views;
 
         if (views.length > 0) {
-            buffer.push(`<nav id="views">
+            buffer.push(`<nav id="views padding-body">
             <p class="views tabbar" data-tab-callback="onViewSelected">\n`);
 
             buffer.push(`<a class="tab active" data-tab-context="all">All</a>`);
@@ -231,7 +254,7 @@ export class HTMLExporter extends Exporter {
             }
         }
 
-        buffer.push(`<nav id="toc">`);
+        buffer.push(`<nav id="toc" class="padding-body">`);
 
         if (!tocConfig.hideHeader) {
             buffer.push(`<h1>Table of Contents</h1>\n`);
@@ -1019,7 +1042,7 @@ initTabBars();
 const HTMLStylesheetOverrides = `
 body {
   text-align: left;
-  margin: 6rem 2rem 1rem;
+  margin: 0 0 1rem;
   max-width: 100%;
 }
 
@@ -1245,6 +1268,44 @@ a#back-to-top {
 
 a#back-to-top:hover {
     opacity: 0.5;
+}
+
+header h1 {
+    text-align: center;
+    margin-top: 40px;
+}
+
+.padding-body {
+    margin: 0 2rem;
+}
+
+.brands {
+    position: sticky;
+    top: 0;
+    background-color: #FFF;
+    z-index: 10;
+    
+    box-shadow: var(--border-subtle-color,rgba(0, 0, 0, .08)) 0 1px 0;
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    padding: 15px 25px;
+}
+
+.brands > .brand {
+    flex: 0 1 auto;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    font-size: 1.7rem;
+    font-weight: 600;
+    color: #005b9d;
+}
+
+.brands > .brand img {
+    height: 30px;
+    width: auto;
+    border-radius: 0;
 }
 `;
 

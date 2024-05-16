@@ -23,6 +23,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
     node cli.js download Phase1 Phase2
     ```
    **Breaking Change** The `backlogs` argument is optional, and when not provided in the command, all backlogs present in the configuration file are downloaded sequentially, a change from the old behavior of downloading the first configured backlog only.
+ - Add Brand images to a backlog, to be included on the top of the document. They are spaced evenly among themselves on an horizontal axis.
+    ```json
+    brand "CriticalManufacturing.png"
+    brand "Vandewiele.png"
+    ```
+    For better results, the images should:
+      - Follow the style of an horizontal banner, with the logo on the left, and the brand name on the right side
+      - Have a transparent background (`*.png` format is advised)
+      - Be cropped without any empty padding on the image itself (this prevents images with different paddings from looking bigger or smaller)
 
 ## [0.2.0] - 2024-04-14
 

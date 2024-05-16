@@ -51,3 +51,24 @@ export function pp(raw: TemplateStringsArray, ...variables: unknown[]) {
         }
     }));
 }
+
+export function streamToBuffer(stream: NodeJS.ReadableStream) {
+    const chunks: Buffer[] = [];
+    return new Promise<Buffer>((resolve, reject) => {
+        stream.on('data', (chunk) => chunks.push(Buffer.from(chunk)));
+        stream.on('error', (err) => reject(err));
+        stream.on('end', () => resolve(Buffer.concat(chunks)));
+    });
+}
+
+export async function streamToString(stream: NodeJS.ReadableStream) {
+    const buffer = await streamToBuffer(stream);
+
+    return buffer.toString('utf-8');
+}
+
+export async function streamToBase64(stream: NodeJS.ReadableStream) {
+    const buffer = await streamToBuffer(stream);
+
+    return buffer.toString('base64');
+}
