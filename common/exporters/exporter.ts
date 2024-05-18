@@ -28,4 +28,5 @@ export abstract class Exporter {
 
 export interface ExporterOptions {
     overwrite?: boolean;
+    mkdir?: boolean;
 }

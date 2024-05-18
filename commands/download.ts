@@ -7,6 +7,7 @@ import { HTMLExporter } from '../common/exporters/html';
 import { JsonExporter } from '../common/exporters/json';
 import { Backlog } from '../common/model';
 import { ExporterManager } from '../common/exporterManager';
+import path from 'path';
 
 export class DownloadCommand extends Command {
     static description = 'Download the backlog as file(s) into the hard-drive';
@@ -167,14 +168,15 @@ export class DownloadCommand extends Command {
             exporter.addFormat(HTMLExporter);
     
             for (const outputConfig of outputConfigs) {
-                const output = exporter.interpolate(outputConfig.path);
+                const output = path.resolve(exporter.interpolate(outputConfig.path));
     
                 if (isDefaultOutput) {
                     logger.info(pp`No outputs configured for backlog ${backlogConfig.name}, using ${output} as a default.`);
                 }
     
                 await exporter.run(output, outputConfig.format, {
-                    overwrite: args.overwrite
+                    overwrite: args.overwrite ?? outputConfig.overwrite ?? false,
+                    mkdir: outputConfig.mkdir ?? false,
                 });
             }
         }

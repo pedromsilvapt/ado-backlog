@@ -4,13 +4,22 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
+## Unreleased
+
+### Added
+ - Allow setting the `mkdir` and `overwrite` properties on the output configurations
+    ```json
+    output "_archive/{{it.backlogConfig.name}}-{{it.now | format('yyyyMMdd')}}.html" mkdir=true
+    output "{{it.backlogConfig.name}}.html" overwrite=true
+    ```
+
 ## [0.3.0] - 2024-05-17
 
 ### Added
  - Multiple outputs directly on the config file, per backlog
     ```json
-    output "_archive/{{it.backlogConfig.name}}-{{it.now | format('yyyyMMdd')}}.html" mkdir=true
-    output "{{it.backlogConfig.name}}.html" overwrite=true
+    output "_archive/{{it.backlogConfig.name}}-{{it.now | format('yyyyMMdd')}}.html"
+    output "{{it.backlogConfig.name}}.html"
     ```
     Most commonly, the format to use is derived from the file extension. Additionally each output may contain an optional `format="<format_name>"` to override which format to use.
     Supported formats currently are `html` (standard), `json` (mostly useful for debugging, since it contains the raw data about the work items, including all fields) or `md` (incomplete).
@@ -35,9 +44,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
  - Add arbitrary markdown-formatted appendixes to the backlog export, such as document version history tables:
     ```json
         appendix title="Document Version History" r#"
-|Date|Version|Changes|Authors|
-|:--:|:-----:|-------|-------|
-|2024-05-17|1.0|Document Creation and Approval|Project Manager Name|
+    |Date|Version|Changes|Authors|
+    |:--:|:-----:|-------|-------|
+    |2024-05-17|1.0|Document Creation and Approval|Project Manager Name|
         "#
     ```
 

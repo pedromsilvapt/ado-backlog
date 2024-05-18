@@ -33,11 +33,24 @@ export class HTMLExporter extends Exporter {
             throw new Error(`Argument 'options' cannot be null.`);
         }
 
-        if (await fs.access(output).catch(() => false)) {
+        const outputFolder = path.dirname(output);
+        const folderExists = await fs.access(outputFolder).then(() => true, () => false);
+
+        if (!folderExists) {
+            if (options.mkdir) {
+                await fs.mkdir(outputFolder, { recursive: true });
+            } else {
+                throw new Error(`Output folder '${outputFolder}' does not exist. Create it beforehand or configure the "mkdir=true" property on the "output" element in the config file.`);
+            }
+        }
+
+        const fileExists = await fs.access(output).then(() => true, () => false);
+
+        if (fileExists) {
             if (options.overwrite) {
                 await fs.rm(output, { recursive: true, force: true } as any);
             } else {
-                throw new Error(`Output file '${output}' already exists. Pass the '--overwrite' argument to delete the file and write again.`);
+                throw new Error(`Output file '${output}' already exists. Pass the '--overwrite' argument to delete the file and write again, or configure the "overwrite=true" property on the "output" element in the config file.`);
             }
         }
 

@@ -97,6 +97,12 @@ export class BacklogOutputConfig {
 
     @Optional() @Property("format", String)
     format?: string;
+
+    @Optional() @Property("overwrite", Boolean)
+    overwrite?: boolean;
+
+    @Optional() @Property("mkdir", Boolean)
+    mkdir?: boolean;
 }
 
 export class BrandConfig {
