@@ -13,6 +13,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
     output "{{it.backlogConfig.name}}.html" overwrite=true
     ```
 
+### Fixed
+ - Fixed topbar hiding top of work items when clicking on links to them
+
+
 ## [0.3.0] - 2024-05-17
 
 ### Added

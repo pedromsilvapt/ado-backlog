@@ -158,7 +158,7 @@ export class HTMLExporter extends Exporter {
     protected async exportBrands(buffer: string[]) {
         if (this.backlog.config.brands.length > 0) {
             buffer.push(`<div class="brands">\n`);
-            
+
             for (const brand of this.backlog.config.brands) {
                 const brandStream = createReadStream(brand.logo);
 
@@ -393,11 +393,11 @@ export class HTMLExporter extends Exporter {
         if (this.backlog.config.appendixes.length > 0) {
             for (const appendix of this.backlog.config.appendixes) {
                 buffer.push(`<section class="appendix from-markdown">\n`);
-                
+
                 if (appendix.title != null) {
                     buffer.push(`<h1>${he.encode(appendix.title)}</h1>\n`);
                 }
-                
+
                 if (appendix.content != null) {
                     buffer.push(`${marked.parse(appendix.content)}\n`);
                 }
@@ -1075,6 +1075,10 @@ initTabBars();
 `;
 
 const HTMLStylesheetOverrides = `
+html {
+    scroll-padding-top: 70px;
+}
+
 body {
   text-align: left;
   margin: 0 0 1rem;
@@ -1319,7 +1323,7 @@ header h1 {
     top: 0;
     background-color: #FFF;
     z-index: 10;
-    
+
     box-shadow: var(--border-subtle-color,rgba(0, 0, 0, .08)) 0 1px 0;
     display: flex;
     flex-direction: row;
