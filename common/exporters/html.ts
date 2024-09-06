@@ -399,7 +399,10 @@ export class HTMLExporter extends Exporter {
                 }
 
                 if (appendix.content != null) {
-                    buffer.push(`${marked.parse(appendix.content)}\n`);
+                    const tokenizer = new marked.Tokenizer();
+                    tokenizer.code = (src: string): marked.Tokens.Code | undefined => { return; }
+
+                    buffer.push(`${marked.parse(appendix.content, { tokenizer })}\n`);
                 }
 
                 buffer.push(`</section>\n`);
