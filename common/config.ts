@@ -7,9 +7,6 @@ export class ApiConfig {
     @Property("organizationUrl", String)
     organizationUrl!: string;
 
-    @Property("deployementUrl", String)
-    deployementUrl!: string;
-
     @Property("token", String)
     token!: string;
 
@@ -91,7 +88,7 @@ export class BacklogOutputConfig {
     public constructor(path?: string) {
         this.path = path!;
     }
-    
+
     @Value(0, String)
     path!: string;
 

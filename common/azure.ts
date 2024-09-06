@@ -16,8 +16,6 @@ const SPRINT_FORMAT = 'dd MMM';
 export class AzureClient {
     protected connection: azdev.WebApi;
 
-    protected deployementConnection: azdev.WebApi;
-
     public logger: LoggerInterface;
 
     public config: TfsConfig;
@@ -31,13 +29,6 @@ export class AzureClient {
 
         this.connection = new azdev.WebApi(
             this.config.api.organizationUrl,
-            azdev.getPersonalAccessTokenHandler(this.config.api.token),
-            {
-                ignoreSslError: this.config.api.ignoreSsl,
-            }
-        );
-        this.deployementConnection = new azdev.WebApi(
-            this.config.api.deployementUrl,
             azdev.getPersonalAccessTokenHandler(this.config.api.token),
             {
                 ignoreSslError: this.config.api.ignoreSsl,
