@@ -1,9 +1,11 @@
 import yargs from 'yargs';
-import { DownloadCommand } from './commands/download';
 import { Command } from './commands/command';
+import { DownloadCommand } from './commands/download';
+import { InitCommand } from './commands/init';
 
 const commands: Command[] = [
-    new DownloadCommand()
+    new DownloadCommand(),
+    new InitCommand(),
 ];
 
 let commandLine = yargs(process.argv.slice(2));
