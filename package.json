@@ -26,6 +26,7 @@
   "author": "Pedro M. Silva <pedrosilva@criticalmanufacturing.com>",
   "license": "ISC",
   "dependencies": {
+    "@clack/prompts": "^0.7.0",
     "@gallant/config": "^0.2.0",
     "@oclif/core": "^3.18.1",
     "azure-devops-node-api": "^7.2.0",
