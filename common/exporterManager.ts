@@ -5,6 +5,7 @@ import { BacklogConfig, TemplateConfig } from './config';
 import { Exporter, ExporterOptions } from './exporters/exporter';
 import * as Sqrl from 'squirrelly';
 import { DateTime } from 'luxon';
+import { IMetricsContainer, Metric } from './metrics';
 
 export class ExporterManager {
     public readonly logger: LoggerInterface;
@@ -19,13 +20,16 @@ export class ExporterManager {
 
     public formats: Exporter[];
 
-    public constructor(logger: LoggerInterface, azure: AzureClient, backlog: Backlog, backlogConfig: BacklogConfig, templates: TemplateConfig[]) {
+    public metrics: Record<'export', Metric>;
+
+    public constructor(logger: LoggerInterface, azure: AzureClient, backlog: Backlog, backlogConfig: BacklogConfig, templates: TemplateConfig[], metrics: IMetricsContainer) {
         this.logger = logger;
         this.azure = azure;
         this.backlog = backlog;
         this.backlogConfig = backlogConfig;
         this.templates = templates;
         this.formats = [];
+        this.metrics = metrics.create(['export']);
     }
 
     public addFormat(exporterClass: ExporterClass) {
@@ -33,7 +37,7 @@ export class ExporterManager {
 
         this.formats.push(exporter);
     }
-    
+
     public interpolate(outputTemplate: string): string {
         return Sqrl.render(outputTemplate, {
             backlogConfig: this.backlogConfig,
@@ -69,7 +73,8 @@ export class ExporterManager {
         }
 
         this.logger.info(pp`Exporting to ${output} with exporter ${exporter.name}`);
-        await exporter.run(output, options);
+
+        await this.metrics.export.measureAsync(() => exporter.run(output, options));
     }
 }
 

@@ -8,6 +8,7 @@ import { JsonExporter } from '../common/exporters/json';
 import { Backlog } from '../common/model';
 import { ExporterManager } from '../common/exporterManager';
 import path from 'path';
+import { IMetricsContainer, MetricsContainer } from '../common/metrics';
 
 export class DownloadCommand extends Command {
     static description = 'Download the backlog as file(s) into the hard-drive';
@@ -31,6 +32,12 @@ export class DownloadCommand extends Command {
             boolean: true,
         });
 
+        yargs.option('profile', {
+            describe: 'collect performance statistics about the execution of the command and print them in the end',
+            type: 'boolean',
+            boolean: false,
+        });
+
         yargs.option('output', {
             alias: 'o',
             describe: 'output folder to write the contents to',
@@ -48,9 +55,9 @@ export class DownloadCommand extends Command {
     /**
      * Returns the list of backlog configs for the provided args.
      * If no backlogs are explicitly set in the args object, then all backlog configs found in the file are returned.
-     * 
-     * @param args 
-     * @returns 
+     *
+     * @param args
+     * @returns
      */
     public getBacklogConfigs(args: DownloadCommandOptions): BacklogConfig[] {
         let configs: BacklogConfig[] = [];
@@ -66,7 +73,7 @@ export class DownloadCommand extends Command {
 
             for (const backlog of backlogArgs) {
                 const backlogConfig = this.config!.backlogs.find(b => b.name == backlog);
-    
+
                 if (backlogConfig == null) {
                     this.logger!.error(pp`No backlog found in the configuration file named ${backlog}`);
                     errorFound = true;
@@ -92,46 +99,48 @@ export class DownloadCommand extends Command {
         const config = this.config!;
         const logger = this.logger!;
 
+        const metrics: IMetricsContainer = new MetricsContainer(logger);
+
         // Configure Azure Client
-        const azure = new AzureClient(logger.service('tfs'), config);
+        const azure = new AzureClient(logger.service('tfs'), config, metrics.for('azure'));
 
         const backlogConfigs = this.getBacklogConfigs(args);
 
         for (const backlogConfig of backlogConfigs) {
             const project = await azure.getProjectByName(backlogConfig.project);
-    
+
             if (project == null) {
                 logger.error(pp`No project found in the TFS named ${backlogConfig.project}`);
                 return;
             }
-    
+
             logger.info(pp`Downloading backlog content workitems...`);
-    
+
             const queryResults = await azure.getQueryWorkItems(project, backlogConfig);
-    
+
             let content: BacklogContentConfig[] = backlogConfig.content;
-    
+
             if (content == null) {
                 logger.error(pp`Backlog has no content (work item types) defined in the configuration.`);
                 return;
             }
-    
+
             const tree = await azure.buildContent(queryResults, content);
-    
+
             const workItemTypes = await azure.getWorkItemTypes(project.id!);
-    
+
             const workItemStateColors = await azure.getWorkItemStates(project.name!);
-    
+
             const views: Record<string, number[]> = {};
-    
+
             for (const view of backlogConfig.views) {
                 if (view.name in views) {
                     logger.error(pp`Duplicate view with name ${view.name} found in config, skipping it.`);
                     continue;
                 }
-    
+
                 logger.info(pp`Downloading query results for view ${view.name}...`);
-    
+
                 // When both the backlog and the view are retrieved using a WIQL
                 // query directly in the code, we combine both queries for the view
                 if (backlogConfig.query != null && view.query != null) {
@@ -144,40 +153,46 @@ export class DownloadCommand extends Command {
                     views[view.name] = await azure.getQueryResults(project, view);
                 }
             }
-    
+
             let outputConfigs = args.output != null
                 ? [new BacklogOutputConfig(args.output)]
                 : backlogConfig.outputs;
-    
+
             // Boolean flag which indicates if the output we will be using is the default provided one. Used to print a message in such cases,
             // Informing the user that the default output is being used, and that they can use custom outputs.
             let isDefaultOutput = false;
-    
+
             // The default output is an HTML file on the current working directory with the name of the backlog
             if (outputConfigs == null || outputConfigs.length == 0) {
                 outputConfigs = [new BacklogOutputConfig('{{it.backlogConfig.name}}.html')];
-    
+
                 isDefaultOutput = true;
             }
-    
+
             const backlog = new Backlog(workItemTypes, workItemStateColors, backlogConfig, config.toc, config.workItems, tree, views);
-    
-            const exporter = new ExporterManager(logger, azure, backlog, backlogConfig, config.templates);
+
+            const exporter = new ExporterManager(logger, azure, backlog, backlogConfig, config.templates, metrics.for("output"));
             exporter.addFormat(HTMLExporter);
             exporter.addFormat(JsonExporter);
             exporter.addFormat(HTMLExporter);
-    
+
             for (const outputConfig of outputConfigs) {
                 const output = path.resolve(exporter.interpolate(outputConfig.path));
-    
+
                 if (isDefaultOutput) {
                     logger.info(pp`No outputs configured for backlog ${backlogConfig.name}, using ${output} as a default.`);
                 }
-    
+
                 await exporter.run(output, outputConfig.format, {
                     overwrite: args.overwrite ?? outputConfig.overwrite ?? false,
                     mkdir: outputConfig.mkdir ?? false,
                 });
+            }
+
+            if (args.profile) {
+                logger.info('Profiling metrics summary:');
+
+                metrics.printSummary();
             }
         }
     }
@@ -186,5 +201,6 @@ export class DownloadCommand extends Command {
 export interface DownloadCommandOptions {
     backlogs?: string[];
     overwrite?: boolean;
+    profile?: boolean;
     output: string;
 }

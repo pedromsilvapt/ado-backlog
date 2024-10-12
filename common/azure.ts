@@ -9,6 +9,7 @@ import { QueryExpand, QueryHierarchyItem, WorkItem, WorkItemExpand } from 'azure
 import * as path from 'path';
 import { IWorkItemTrackingApi } from 'azure-devops-node-api/WorkItemTrackingApi';
 import { streamToBase64, streamToString } from "./utils";
+import { IMetricsContainer, Metric, ProfileAsync } from './metrics';
 
 const DAY_FORMAT = 'yyyyMMdd';
 const SPRINT_FORMAT = 'dd MMM';
@@ -22,7 +23,9 @@ export class AzureClient {
 
     protected _accountsCache: Map<string, TfsTeamMemberCapacity>;
 
-    public constructor(logger: LoggerInterface, config: TfsConfig) {
+    public metrics: Record<'getProjectByName' | 'query' | 'getWorkItems' | 'downloadAttachment', Metric>;
+
+    public constructor(logger: LoggerInterface, config: TfsConfig, metrics: IMetricsContainer) {
         this._accountsCache = new Map();
         this.logger = logger;
         this.config = config;
@@ -35,9 +38,12 @@ export class AzureClient {
             }
         );
 
+        this.metrics = metrics.create(['getProjectByName', 'query', 'getWorkItems', 'downloadAttachment'] as const);
+
         // Settings.defaultZone = config.timeZone;
     }
 
+    @ProfileAsync('getProjectByName')
     public async getProjectByName(name: string): Promise<TeamProjectReference | undefined> {
         const coreApi = await this.connection.getCoreApi();
 
@@ -54,6 +60,7 @@ export class AzureClient {
         return selectedProject;
     }
 
+    @ProfileAsync('getWorkItems')
     public async getWorkItemsById(ids: number[]): Promise<WorkItem[]> {
         const witApi = await this.connection.getWorkItemTrackingApi();
 
@@ -86,9 +93,9 @@ export class AzureClient {
 
         this.logger.debug(pp`Executig query by id ${queryId} for project ${project?.name} (id ${project?.id})`);
 
-        const results = await witApi.queryById(query.id!, {
+        const results = await this.metrics.query.measureAsync(() => witApi.queryById(query.id!, {
             projectId: project.id!
-        });
+        }));
 
         return results.workItems!.map(wi => wi.id!);
     }
@@ -100,7 +107,7 @@ export class AzureClient {
 
         const allQueries = await witApi.getQueries(project.id!, QueryExpand.Minimal, 2);
 
-        const flattenQueries: (q : QueryHierarchyItem) => QueryHierarchyItem[] = q => [q, ...(q?.children?.flatMap(flattenQueries) ?? [])];
+        const flattenQueries: (q: QueryHierarchyItem) => QueryHierarchyItem[] = q => [q, ...(q?.children?.flatMap(flattenQueries) ?? [])];
 
         const query = allQueries.flatMap(flattenQueries).find(query => query.name == queryName);
 
@@ -110,9 +117,9 @@ export class AzureClient {
 
         this.logger.debug(pp`Executig query by id ${query.id!} for project ${project?.name} (id ${project?.id})`);
 
-        const results = await witApi.queryById(query.id!, {
+        const results = await this.metrics.query.measureAsync(() => witApi.queryById(query.id!, {
             projectId: project.id!
-        });
+        }));
 
         return results.workItems!.map(wi => wi.id!);
     }
@@ -124,9 +131,9 @@ export class AzureClient {
 
         this.logger.debug(pp`Executig query by wiql ${query} for project ${project?.name} (id ${project?.id})`);
 
-        const results = await witApi.queryByWiql({ query }, {
+        const results = await this.metrics.query.measureAsync(() => witApi.queryByWiql({ query }, {
             projectId: project.id!
-        });
+        }));
 
         return results.workItems!.map(wi => wi.id!);
     }
@@ -275,6 +282,7 @@ export class AzureClient {
         return null;
     }
 
+    @ProfileAsync('downloadAttachment')
     public async downloadAttachmentUrl(url: string): Promise<NodeJS.ReadableStream | null> {
         const urlObj = this.parseAttachmentUrl(url);
 
@@ -287,6 +295,7 @@ export class AzureClient {
         return null;
     }
 
+    @ProfileAsync('downloadAttachment')
     public async downloadAttachmentUrlBase64(url: string): Promise<string | null> {
         const urlObj = this.parseAttachmentUrl(url);
 

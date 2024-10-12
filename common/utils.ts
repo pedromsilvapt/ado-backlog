@@ -72,3 +72,31 @@ export async function streamToBase64(stream: NodeJS.ReadableStream) {
 
     return buffer.toString('base64');
 }
+
+export function humanizeDuration(duration: number) : {value: number, unit: 'µs' | 'ms' | 'sec' | 'min' | 'h'} {
+    if (duration < 1) {
+        return { value: (duration % 1 * 1000), unit: 'µs' };
+    } else if (duration < 1000) {
+        return { value: round(duration) / 100, unit: 'ms' };
+    } else if (duration < 1000 * 60) {
+        return { value: round(duration / 1000, 2), unit: 'sec' };
+    } else if (duration < 1000 * 60 * 60) {
+        return { value: Math.round(duration / 1000 / 60), unit: 'min' };
+    } else { // 1000 * 60 * 60 * 24
+        return { value: Math.round(duration / 1000 / 60 / 60), unit: 'h' };
+    }
+}
+
+export function humanizeDurationString(duration: number) : string {
+    const humanDuration = humanizeDuration(duration);
+
+    return `${humanDuration.value} ${humanDuration.unit}`;
+}
+
+export function round(n: number, digits: number = 0): number {
+    if (digits == 0) return Math.round(n);
+
+    const power = Math.pow(10, digits);
+
+    return Math.round(n * power) / power;
+}
