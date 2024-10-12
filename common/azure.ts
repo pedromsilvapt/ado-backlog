@@ -10,6 +10,7 @@ import * as path from 'path';
 import { IWorkItemTrackingApi } from 'azure-devops-node-api/WorkItemTrackingApi';
 import { streamToBase64, streamToString } from "./utils";
 import { IMetricsContainer, Metric, ProfileAsync } from './metrics';
+import assert from 'assert';
 
 const DAY_FORMAT = 'yyyyMMdd';
 const SPRINT_FORMAT = 'dd MMM';
@@ -97,7 +98,7 @@ export class AzureClient {
             projectId: project.id!
         }));
 
-        return results.workItems!.map(wi => wi.id!);
+        return (results.workItems || []).map(wi => wi.id!);
     }
 
     public async getQueryResultsByName(project: TeamProjectReference, queryName: string): Promise<number[]> {
@@ -121,7 +122,7 @@ export class AzureClient {
             projectId: project.id!
         }));
 
-        return results.workItems!.map(wi => wi.id!);
+        return (results.workItems || []).map(wi => wi.id!);
     }
 
     public async getQueryResultsByWiql(project: TeamProjectReference, queryWiql: string): Promise<number[]> {
@@ -135,7 +136,7 @@ export class AzureClient {
             projectId: project.id!
         }));
 
-        return results.workItems!.map(wi => wi.id!);
+        return (results.workItems || []).map(wi => wi.id!);
     }
 
     public async getQueryResults(project: TeamProjectReference, options: QueryObject): Promise<number[]> {
@@ -216,7 +217,7 @@ export class AzureClient {
                 let parentId: number | null = null;
 
                 for (const rel of child.workItem.relations!) {
-                    if (rel.attributes!.name !== "Parent") {
+                    if (rel.attributes?.name !== "Parent") {
                         continue;
                     }
 
@@ -252,11 +253,13 @@ export class AzureClient {
         const types = await witApi.getWorkItemTypes(projectId);
 
         for (const type of types) {
-            const iconStream = await witApi.getWorkItemIconSvg(type.icon!.id!, type.color?.substring(2));
+            assert(type.icon != null, `Work Item type ${type.name} must have an icon`);
+            assert(type.icon.id != null, `Work Item type ${type.name} icon must have an id`);
+
+            const iconStream = await witApi.getWorkItemIconSvg(type.icon.id, type.color?.substring(2));
 
             const icon = await streamToString(iconStream);
 
-            type.fields
             workItemTypes.push(new BacklogWorkItemType(type.name!, type.color!, icon));
         }
 

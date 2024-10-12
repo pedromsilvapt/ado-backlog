@@ -217,7 +217,8 @@ export class BacklogWorkItem {
         this.workItem = workItem;
         this.hasChildren = hasChildren;
         this.children = children;
-        this.relations = workItem.relations!
+        this.relations = (workItem.relations ?? [])
+            .filter(rel => rel.rel != null && rel.url != null)
             .map(rel => new BacklogWorkItemRelation(rel.rel!, BacklogWorkItem.getIdFromUrl(rel.url!)))
             .filter(rel => rel.workItemId != this.id);
 
