@@ -77,7 +77,7 @@ export function humanizeDuration(duration: number) : {value: number, unit: 'µs'
     if (duration < 1) {
         return { value: (duration % 1 * 1000), unit: 'µs' };
     } else if (duration < 1000) {
-        return { value: round(duration) / 100, unit: 'ms' };
+        return { value: round(duration), unit: 'ms' };
     } else if (duration < 1000 * 60) {
         return { value: round(duration / 1000, 2), unit: 'sec' };
     } else if (duration < 1000 * 60 * 60) {
