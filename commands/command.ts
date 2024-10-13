@@ -4,11 +4,14 @@ import { ConsoleBackend, FilterBackend, MultiBackend, SharedLogger } from 'clui-
 import { TIMESTAMP_SHORT } from 'clui-logger/lib/Backends/ConsoleBackend';
 import { Config } from '@gallant/config';
 import yargs from 'yargs';
+import { IMetricsContainer, MetricsContainer } from '../common/metrics';
 
 export abstract class Command {
     logger: LoggerInterface | null = null;
 
     config: TfsConfig | null = null;
+
+    metrics: IMetricsContainer | null = null;
 
     abstract readonly name : string;
 
@@ -17,7 +20,7 @@ export abstract class Command {
     public constructor() {}
 
     public register( yargv : yargs.Argv ) : yargs.Argv {
-        return yargv.command( this.name, this.usage, this.configure.bind(this), (argv) => {
+        return yargv.command( this.name, this.usage, this.configure.bind(this), async (argv) => {
 
             // Load configuration file from the current working directory
             const config: TfsConfig = Config.load((argv.config as string) || 'config.kdl', TfsConfigFormat).data;
@@ -33,9 +36,24 @@ export abstract class Command {
             ]));
 
             this.config = config;
-            this.logger = logger.service(this.constructor.name)
+            this.logger = logger.service(this.constructor.name);
 
-            this.run(argv).catch(err => this.logger!.error(err.message + '\n' + (err.stack ?? '')));
+            const rootMetrics = new MetricsContainer(this.logger);
+            rootMetrics.create([this.name]);
+
+            this.metrics = rootMetrics.for(this.name);
+
+            await rootMetrics.measureAsync(
+                this.name,
+                () => this.run(argv)
+                    .catch(err => this.logger!.error(err.message + '\n' + (err.stack ?? '')))
+            );
+
+            if ((argv.profile as boolean)) {
+                this.logger!.info('Profiling metrics summary:');
+
+                rootMetrics.printSummary();
+            }
         } );
     }
 

@@ -8,7 +8,6 @@ import { JsonExporter } from '../common/exporters/json';
 import { Backlog } from '../common/model';
 import { ExporterManager } from '../common/exporterManager';
 import path from 'path';
-import { IMetricsContainer, MetricsContainer } from '../common/metrics';
 
 export class DownloadCommand extends Command {
     static description = 'Download the backlog as file(s) into the hard-drive';
@@ -98,8 +97,7 @@ export class DownloadCommand extends Command {
     async run(args: DownloadCommandOptions): Promise<void> {
         const config = this.config!;
         const logger = this.logger!;
-
-        const metrics: IMetricsContainer = new MetricsContainer(logger);
+        const metrics = this.metrics!;
 
         // Configure Azure Client
         const azure = new AzureClient(logger.service('tfs'), config, metrics.for('azure'));
@@ -189,18 +187,11 @@ export class DownloadCommand extends Command {
                 });
             }
         }
-
-        if (args.profile) {
-            logger.info('Profiling metrics summary:');
-
-            metrics.printSummary();
-        }
     }
 }
 
 export interface DownloadCommandOptions {
     backlogs?: string[];
     overwrite?: boolean;
-    profile?: boolean;
     output: string;
 }
