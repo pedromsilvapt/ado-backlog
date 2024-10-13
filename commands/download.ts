@@ -188,12 +188,12 @@ export class DownloadCommand extends Command {
                     mkdir: outputConfig.mkdir ?? false,
                 });
             }
+        }
 
-            if (args.profile) {
-                logger.info('Profiling metrics summary:');
+        if (args.profile) {
+            logger.info('Profiling metrics summary:');
 
-                metrics.printSummary();
-            }
+            metrics.printSummary();
         }
     }
 }
