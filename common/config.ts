@@ -45,16 +45,26 @@ export class BacklogContentSortConfig {
     @Value(0, String)
     field!: string;
 
-    @Value(1, String)
-    direction?: "asc" | "desc";
+    @Optional() @Value(1, String)
+    direction?: "asc" | "desc" = "asc";
+
+    static create(field: string, direction: "asc" | "desc" = "asc") {
+        var obj = new BacklogContentSortConfig();
+        obj.field = field;
+        obj.direction = direction;
+        return obj;
+    }
 }
 
 export class BacklogContentConfig {
     @Values(0, String)
     workItemTypes!: string[];
 
-    @Optional() @Child("sort", BacklogContentSortConfig)
-    sort?: BacklogContentSortConfig;
+    @Optional() @Property('fetch-parents', Boolean)
+    fetchParents?: boolean;
+
+    @Optional() @Children("order-by", BacklogContentSortConfig)
+    orderBy?: BacklogContentSortConfig[];
 
     @Optional() @Children('content', BacklogContentConfig)
     content!: BacklogContentConfig[];
@@ -68,6 +78,16 @@ export class BacklogContentConfig {
             }
         }
     }
+}
+
+export class BacklogContentDefaultsConfig {
+    @Optional() @Property('fetch-parents', Boolean)
+    fetchParents: boolean = true;
+
+    @Optional() @Children("order-by", BacklogContentSortConfig)
+    orderBy: BacklogContentSortConfig[] = [
+        BacklogContentSortConfig.create('Microsoft.VSTS.Common.StackRank')
+    ];
 }
 
 export class BacklogViewConfig {
@@ -133,6 +153,9 @@ export class BacklogConfig {
 
     @Children('brand', BrandConfig)
     brands!: BrandConfig[];
+
+    @Default() @Child('content-defaults', BacklogContentDefaultsConfig)
+    contentDefaults!: BacklogContentDefaultsConfig;
 
     @Children('content', BacklogContentConfig)
     content!: BacklogContentConfig[];
@@ -279,8 +302,8 @@ export class TemplateConfig {
 }
 
 export class TfsConfig {
-    @Default() @Child("debug", Boolean)
-    debug!: boolean;
+    @Optional() @Property("debug", Boolean)
+    debug: boolean = false;
 
     @Child("api", ApiConfig)
     api!: ApiConfig;

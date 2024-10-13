@@ -1,3 +1,6 @@
+---
+outline: [2, 2]
+---
 # Release Notes
 
 All notable changes to this project will be documented in this file.
@@ -12,9 +15,98 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
     output "_archive/{{it.backlogConfig.name}}-{{it.now | format('yyyyMMdd')}}.html" mkdir=true
     output "{{it.backlogConfig.name}}.html" overwrite=true
     ```
+ - Added the [`ado-backlog init`](/guide/getting-started#usage) command to scaffold a basic configuration file
+ - Added `--profile` option to `download` command to display time statistics.
+    
+   ```shell
+   # The ellipsis ... represent any other options you
+   # normally pass to the download command
+   ado-backlog download --profile ...
+   ```
+ - Config option `fetch-parents` for backlog content
+    ```kdl
+    // [!code word:fetch-parents=true]
+    content-defaults fetch-parents=true
+
+    content "Epic" {
+        // ...
+    ```
+   :::: details More details
+
+   When this option is active, only the child work items (**User Story** and **Bugs** in the example above) need to be specified in the backlog query. Their parents will be fetched on demand and automatically included on the backlog. 
+   
+   This means that the backlog query can, **optionally**, be modified according to the example below and still export the same work items.
+    ```kdl:line-numbers
+    backlog "Phase1" project="MyProject" query=r#"
+            [System.TeamProject] = @project
+            AND [System.WorkItemType] IN ('Epic', 'Feature', 'User Story', 'Bug') // [!code --]
+            AND [System.WorkItemType] IN ('User Story', 'Bug') // [!code ++]
+            AND [System.State] <> 'Removed'
+            "# {
+    ```
+    ::::
+
+    ::: danger Breaking Change
+    This behavior is now enabled **by default**. This means that parent work items that were not previously included in backlogs, might from now on start to be. You can revert back to the previous behavior by setting `fetch-parents=false`.
+    :::
+ - Config option `order-by` for backlog content
+    ```kdl
+    content-defaults fetch-parents=true {
+        order-by "Microsoft.VSTS.Common.StackRank" // [!code ++]
+    }
+
+    content "Epic" {
+        // ...
+    ```
+    :::: details More details
+    You can also specify multiple order-by tags, and specify different directions (`asc` by default, or `desc` if specified) for each of them.
+
+    ```kdl
+    content-defaults fetch-parents=true {
+        order-by "Microsoft.VSTS.Common.Priority" "desc" // [!code ++]
+        order-by "Microsoft.VSTS.Common.StackRank" "asc" // [!code ++]
+    }
+    ```
+
+    The example above will sort work items by **Priority** in **descending** order first. Any work items with the same priority, will be sorted amongst themselves by **Stack Rank**, in **ascending** order.
+
+    Additionally, this option can also be overridden for each `content` level.    
+    ```kdl
+    content-defaults fetch-parents=true {
+        order-by "Microsoft.VSTS.Common.StackRank"
+    }
+
+    content "Epic" {
+        content "Feature" {
+            content "User Story" "Bug" {
+                order-by "Microsoft.VSTS.Common.Priority" "desc" // [!code ++]
+            }
+        }
+    }
+    ```
+    **Note** that the ordering applies to the content where it is, not to it's children. Here, **Epics** and **Features** would follow the stack rank order, but inside each Feature, **User Stories** and **Bugs** would follow the Priority order instead.
+    ::::
+    
+    ::: danger Breaking Change
+    This behavior is now enabled by default, sorting by `Microsoft.VSTS.Common.StackRank` unless explicitly configured otherwise.
+
+    This means that the `ORDER BY` clause **returned by the query is ignored**. If your query was ordering by the stack rank property, you can just remove it.
+
+    ```kdl:line-numbers
+    backlog "Phase1" project="MyProject" query=r#"
+            [System.TeamProject] = @project
+            AND [System.WorkItemType] IN ('User Story', 'Bug')
+            AND [System.State] <> 'Removed'
+            ORDER BY [Microsoft.VSTS.Common.StackRank] // [!code --]
+            "# {
+    ```
+
+    If your `ORDER BY` clause was returning the work items sorted by a different field, you must now configure that field on the `order-by` tag instead.
+    :::
 
 ### Fixed
  - Fixed topbar hiding top of work items when clicking on links to them
+ - Fixed error thrown when downloading a backlog containing a work item without any relation at all
 
 
 ## [0.3.0] - 2024-05-17

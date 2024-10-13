@@ -1,9 +1,9 @@
 import * as azdev from "azure-devops-node-api";
-import { TeamProjectReference, WebApiTeam } from 'azure-devops-node-api/interfaces/CoreInterfaces';
-import { DateRange, TeamSetting, TeamSettingsIteration, TeamMemberCapacity as TfsTeamMemberCapacity, Member } from 'azure-devops-node-api/interfaces/WorkInterfaces';
+import { TeamProjectReference } from 'azure-devops-node-api/interfaces/CoreInterfaces';
+import { TeamMemberCapacity as TfsTeamMemberCapacity } from 'azure-devops-node-api/interfaces/WorkInterfaces';
 import { LoggerInterface, pp } from 'clui-logger';
 import { DateTime, Settings } from 'luxon';
-import { BacklogContentConfig, TfsConfig } from './config';
+import { BacklogContentConfig, BacklogContentDefaultsConfig, TfsConfig } from './config';
 import { BacklogWorkItem, BacklogWorkItemType } from './model';
 import { QueryExpand, QueryHierarchyItem, WorkItem, WorkItemExpand } from 'azure-devops-node-api/interfaces/WorkItemTrackingInterfaces';
 import * as path from 'path';
@@ -165,7 +165,7 @@ export class AzureClient {
         return workItems;
     }
 
-    public async buildContent(queryResults: WorkItem[], content: BacklogContentConfig[]): Promise<BacklogWorkItem[]> {
+    public async buildContent(queryResults: WorkItem[], content: BacklogContentConfig[], contentDefaults: BacklogContentDefaultsConfig): Promise<BacklogWorkItem[]> {
         if (content.length === 0) {
             throw new Error("Cannot build content without an work item types hierarchy.");
         }
@@ -174,7 +174,7 @@ export class AzureClient {
 
         const unincludedWorkItems = new Set<number>();
 
-        const backlog = await this.buildContentListRecursive(witApi, queryResults, content, unincludedWorkItems);
+        const backlog = await this.buildContentListRecursive(witApi, queryResults, content, contentDefaults, unincludedWorkItems);
 
         if (unincludedWorkItems.size > 0) {
             this.logger.info(pp`List of unparented Work Items: ${Array.from(unincludedWorkItems).join(', ')}`)
@@ -183,7 +183,7 @@ export class AzureClient {
         return backlog;
     }
 
-    public async buildContentListRecursive(witApi: IWorkItemTrackingApi, queryResults: WorkItem[], contentList: BacklogContentConfig[], unincludedWorkItems: Set<number>): Promise<BacklogWorkItem[]> {
+    public async buildContentListRecursive(witApi: IWorkItemTrackingApi, queryResults: WorkItem[], contentList: BacklogContentConfig[], contentDefaults: BacklogContentDefaultsConfig, unincludedWorkItems: Set<number>): Promise<BacklogWorkItem[]> {
         if (contentList.length === 0) {
             throw new Error("Cannot build content without an work item types hierarchy.");
         }
@@ -191,19 +191,21 @@ export class AzureClient {
         const backlog = [];
 
         for (const content of contentList) {
-            backlog.push(...await this.buildContentRecursive(witApi, queryResults, content, unincludedWorkItems));
+            backlog.push(...await this.buildContentRecursive(witApi, queryResults, content, contentDefaults, unincludedWorkItems));
         }
 
         return backlog;
     }
 
-    public async buildContentRecursive(witApi: IWorkItemTrackingApi, queryResults: WorkItem[], content: BacklogContentConfig, unincludedWorkItems: Set<number>): Promise<BacklogWorkItem[]> {
+    public async buildContentRecursive(witApi: IWorkItemTrackingApi, queryResults: WorkItem[], content: BacklogContentConfig, contentDefaults: BacklogContentDefaultsConfig, unincludedWorkItems: Set<number>): Promise<BacklogWorkItem[]> {
         const hasChildren = content.content != null && content.content.length > 0;
 
         const parentTypes = content.workItemTypes;
         const parentWorkItems = queryResults
             .filter(wi => parentTypes.includes(wi.fields!["System.WorkItemType"]))
             .map(wi => new BacklogWorkItem(wi, hasChildren));
+
+        const fetchParents = content.fetchParents ?? contentDefaults.fetchParents;
 
         if (hasChildren) {
             // Create a map of the parents by id
@@ -212,7 +214,11 @@ export class AzureClient {
                 parentsById.set(parent.id, parent);
             }
 
-            const childrenBacklog = await this.buildContentListRecursive(witApi, queryResults, content.content, unincludedWorkItems);
+            // Create a list to fill with any parent ids that have not been loaded by the query initially
+            // Only when `content.fetchParents == true`
+            const unloadedParents: number[] = [];
+
+            const childrenBacklog = await this.buildContentListRecursive(witApi, queryResults, content.content, contentDefaults, unincludedWorkItems);
             for (const child of childrenBacklog) {
                 let parentId: number | null = null;
 
@@ -230,16 +236,53 @@ export class AzureClient {
                     continue;
                 }
 
-                const parent = parentsById.get(parentId);
+                let parent = parentsById.get(parentId);
 
                 if (parent == null) {
-                    this.logger.warn(child.type + pp` #${child.id} ${child.title} was skipped because its parent #${parentId} is not part of this backlog.`);
-                    unincludedWorkItems.add(parentId);
-                    continue;
+                    // If the parent of this work item was not included in the initial query, we create a placeholder
+                    // backlog item for the parent. As the work item object, we pass null **temporarily**
+                    // After all child items have been processed, we check for any missing parents and load them in batch,
+                    // filling out the missing work item objects of them
+                    if (fetchParents) {
+                        parent = new BacklogWorkItem(null!, true);
+
+                        parentsById.set(parentId, parent);
+
+                        unloadedParents.push(parentId);
+                    } else {
+                        this.logger.warn(child.type + pp` #${child.id} ${child.title} was skipped because its parent #${parentId} is not part of this backlog.`);
+                        unincludedWorkItems.add(parentId);
+                        continue;
+                    }
                 }
 
                 parent.children.push(child);
             }
+
+            if (unloadedParents.length > 0) {
+                for (const wi of await this.getWorkItemsById(unloadedParents)) {
+                    assert(wi.id != null, "work item must have an id");
+
+                    const parent = parentsById.get(wi.id);
+
+                    assert(parent != null, "work item must be of a parent of another work item");
+                    assert(parent.workItem == null, "work item must have been unloaded previously");
+
+                    // Fill out the previously-null work item object
+                    parent.workItem = wi;
+                    parent.updateRelations();
+
+                    // TODO Insert respecting the order of the query
+                    parentWorkItems.push(parent);
+                }
+            }
+        }
+
+        const orderBy = content.orderBy ?? contentDefaults.orderBy;
+
+        // If there is a custom ordering defined, order all the parents by them
+        if (orderBy != null && orderBy.length > 0) {
+            BacklogWorkItem.sort(parentWorkItems, orderBy);
         }
 
         return parentWorkItems;

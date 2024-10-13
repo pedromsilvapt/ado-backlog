@@ -1,6 +1,6 @@
 import { LoggerInterface, SharedLoggerInterface, pp } from 'clui-logger';
 import { AzureClient } from '../common/azure';
-import { BacklogConfig, BacklogContentConfig, BacklogOutputConfig, TfsConfig } from '../common/config';
+import { BacklogConfig, BacklogContentConfig, BacklogContentDefaultsConfig, BacklogContentSortConfig, BacklogOutputConfig, TfsConfig } from '../common/config';
 import { Command } from './command';
 import yargs from 'yargs';
 import { HTMLExporter } from '../common/exporters/html';
@@ -125,7 +125,7 @@ export class DownloadCommand extends Command {
                 return;
             }
 
-            const tree = await azure.buildContent(queryResults, content);
+            const tree = await azure.buildContent(queryResults, content, backlogConfig.contentDefaults);
 
             const workItemTypes = await azure.getWorkItemTypes(project.id!);
 

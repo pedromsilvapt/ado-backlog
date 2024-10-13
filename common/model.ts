@@ -1,5 +1,5 @@
 import { WorkItem } from 'azure-devops-node-api/interfaces/WorkItemTrackingInterfaces';
-import { BacklogConfig, TableOfContentsConfig, WorkItemsConfig } from './config';
+import { BacklogConfig, BacklogContentSortConfig, TableOfContentsConfig, WorkItemsConfig } from './config';
 
 export class Backlog {
     public config: BacklogConfig;
@@ -157,7 +157,7 @@ export class BacklogWorkItem {
     public workItem: WorkItem;
     public hasChildren: boolean;
     public children: BacklogWorkItem[];
-    public relations: BacklogWorkItemRelation[];
+    public relations!: BacklogWorkItemRelation[];
 
     public get id(): number {
         const id = this.workItem.id;
@@ -217,16 +217,55 @@ export class BacklogWorkItem {
         this.workItem = workItem;
         this.hasChildren = hasChildren;
         this.children = children;
-        this.relations = (workItem.relations ?? [])
+
+        this.updateRelations();
+    }
+
+    public updateRelations() {
+        this.relations = (this.workItem?.relations ?? [])
             .filter(rel => rel.rel != null && rel.url != null)
             .map(rel => new BacklogWorkItemRelation(rel.rel!, BacklogWorkItem.getIdFromUrl(rel.url!)))
             .filter(rel => rel.workItemId != this.id);
-
     }
 
     public static getIdFromUrl(url: string): number {
         const segments = url.split("/")!;
         return parseInt(segments[segments.length - 1]);
+    }
+
+    public static sort(backlog: BacklogWorkItem[], orderBy: BacklogContentSortConfig[]) {
+        const comparators = orderBy.map(config => {
+            return (a: BacklogWorkItem, b: BacklogWorkItem) => {
+                let result = 0;
+
+                const valueA = a.workItem.fields?.[config.field];
+                const valueB = b.workItem.fields?.[config.field];
+
+                if (valueA < valueB) {
+                    result = -1;
+                } else if (valueA > valueB) {
+                    result = 1;
+                }
+
+                if (config.direction === 'desc') {
+                    result *= -1;
+                }
+
+                return result;
+            };
+        });
+
+        backlog.sort((a, b) => {
+            for (let i = 0; i < comparators.length; i++) {
+                const result = comparators[i](a, b);
+
+                if (result != 0) {
+                    return result;
+                }
+            }
+
+            return 0;
+        });
     }
 }
 
