@@ -1,4 +1,5 @@
 import chalk from 'chalk';
+import { Readable } from 'stream';
 
 export function sum<T>(iterable: Iterable<T>, accessor: (elem: T) => number): number {
     let total = 0;
@@ -35,7 +36,7 @@ export function max<T>(iterable: Iterable<T>, accessor: (elem: T) => number): nu
 }
 
 export function pp(raw: TemplateStringsArray, ...variables: unknown[]) {
-    return String.raw({raw}, ...variables.map(value => {
+    return String.raw({ raw }, ...variables.map(value => {
         if (value === null) {
             return chalk.yellow('(null)');
         } else if (typeof value === 'undefined') {
@@ -70,10 +71,18 @@ export async function streamToString(stream: NodeJS.ReadableStream) {
 export async function streamToBase64(stream: NodeJS.ReadableStream) {
     const buffer = await streamToBuffer(stream);
 
+    return bufferToBase64(buffer);
+}
+
+export function bufferToBase64(buffer: Buffer): string {
     return buffer.toString('base64');
 }
 
-export function humanizeDuration(duration: number) : {value: number, unit: 'µs' | 'ms' | 'sec' | 'min' | 'h'} {
+export function bufferToStream(buffer: Buffer): NodeJS.ReadableStream {
+    return Readable.from(buffer);
+}
+
+export function humanizeDuration(duration: number): { value: number, unit: 'µs' | 'ms' | 'sec' | 'min' | 'h' } {
     if (duration < 1) {
         return { value: (duration % 1 * 1000), unit: 'µs' };
     } else if (duration < 1000) {
@@ -87,7 +96,7 @@ export function humanizeDuration(duration: number) : {value: number, unit: 'µs'
     }
 }
 
-export function humanizeDurationString(duration: number) : string {
+export function humanizeDurationString(duration: number): string {
     const humanDuration = humanizeDuration(duration);
 
     return `${humanDuration.value} ${humanDuration.unit}`;

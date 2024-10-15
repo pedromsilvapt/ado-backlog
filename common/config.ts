@@ -2,6 +2,7 @@ import { KDLFormat } from '@gallant/config';
 import {
     Tag, Any, Child, Children, Property, Value, Optional, Default, SchemaUtils, Values
 } from '@gallant/config/kdl';
+import { CacheMode } from './cache';
 
 export class ApiConfig {
     @Property("organizationUrl", String)
@@ -304,6 +305,9 @@ export class TemplateConfig {
 export class TfsConfig {
     @Optional() @Property("debug", Boolean)
     debug: boolean = false;
+
+    @Optional() @Property("cache", String)
+    cache: CacheMode = CacheMode.Persistent;
 
     @Child("api", ApiConfig)
     api!: ApiConfig;

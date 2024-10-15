@@ -1,5 +1,6 @@
 import { LoggerInterface, SharedLoggerInterface, pp } from 'clui-logger';
 import { AzureClient } from '../common/azure';
+import { Cache } from '../common/cache';
 import { BacklogConfig, BacklogContentConfig, BacklogContentDefaultsConfig, BacklogContentSortConfig, BacklogOutputConfig, TfsConfig } from '../common/config';
 import { Command } from './command';
 import yargs from 'yargs';
@@ -99,8 +100,10 @@ export class DownloadCommand extends Command {
         const logger = this.logger!;
         const metrics = this.metrics!;
 
+        const cache = new Cache(config.cache, config.api.organizationUrl);
+
         // Configure Azure Client
-        const azure = new AzureClient(logger.service('tfs'), config, metrics.for('azure'));
+        const azure = new AzureClient(logger.service('tfs'), cache, config, metrics.for('azure'));
 
         const backlogConfigs = this.getBacklogConfigs(args);
 
@@ -145,7 +148,7 @@ export class DownloadCommand extends Command {
                     // NOTE: Concatenate the view query first, and only then the backlog query,
                     // to allow the backlog query to have additional clauses (such as ORDER BY)
                     views[view.name] = await azure.getQueryResults(project, {
-                        query: `(${view.query.trim()}) AND ${backlogConfig.query.trim()}`
+                        query: `(${view.query.trim()}) AND (${backlogConfig.query.trim()})`
                     });
                 } else {
                     views[view.name] = await azure.getQueryResults(project, view);
@@ -187,6 +190,8 @@ export class DownloadCommand extends Command {
                 });
             }
         }
+
+        await cache.flush();
     }
 }
 

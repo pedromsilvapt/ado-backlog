@@ -1,16 +1,16 @@
+import assert from 'assert';
 import * as azdev from "azure-devops-node-api";
 import { TeamProjectReference } from 'azure-devops-node-api/interfaces/CoreInterfaces';
-import { TeamMemberCapacity as TfsTeamMemberCapacity } from 'azure-devops-node-api/interfaces/WorkInterfaces';
-import { LoggerInterface, pp } from 'clui-logger';
-import { DateTime, Settings } from 'luxon';
-import { BacklogContentConfig, BacklogContentDefaultsConfig, TfsConfig } from './config';
-import { BacklogWorkItem, BacklogWorkItemType } from './model';
 import { QueryExpand, QueryHierarchyItem, WorkItem, WorkItemExpand } from 'azure-devops-node-api/interfaces/WorkItemTrackingInterfaces';
-import * as path from 'path';
 import { IWorkItemTrackingApi } from 'azure-devops-node-api/WorkItemTrackingApi';
-import { streamToBase64, streamToString } from "./utils";
+import { LoggerInterface, pp } from 'clui-logger';
+import * as path from 'path';
+import { Cache } from './cache';
+import { BacklogContentConfig, BacklogContentDefaultsConfig, TfsConfig } from './config';
 import { IMetricsContainer, Metric, ProfileAsync } from './metrics';
-import assert from 'assert';
+import { BacklogWorkItem, BacklogWorkItemType } from './model';
+import { bufferToBase64, bufferToStream, streamToBuffer, streamToString } from "./utils";
+import { Semaphore } from 'data-semaphore';
 
 const DAY_FORMAT = 'yyyyMMdd';
 const SPRINT_FORMAT = 'dd MMM';
@@ -20,15 +20,15 @@ export class AzureClient {
 
     public logger: LoggerInterface;
 
-    public config: TfsConfig;
+    public cache: Cache;
 
-    protected _accountsCache: Map<string, TfsTeamMemberCapacity>;
+    public config: TfsConfig;
 
     public metrics: Record<'getProjectByName' | 'query' | 'getWorkItems' | 'downloadAttachment', Metric>;
 
-    public constructor(logger: LoggerInterface, config: TfsConfig, metrics: IMetricsContainer) {
-        this._accountsCache = new Map();
+    public constructor(logger: LoggerInterface, cache: Cache, config: TfsConfig, metrics: IMetricsContainer) {
         this.logger = logger;
+        this.cache = cache;
         this.config = config;
 
         this.connection = new azdev.WebApi(
@@ -46,15 +46,27 @@ export class AzureClient {
 
     @ProfileAsync('getProjectByName')
     public async getProjectByName(name: string): Promise<TeamProjectReference | undefined> {
+        let selectedProject = await this.cache.getProject(name);
+
+        if (selectedProject != null) {
+            return selectedProject;
+        }
+
         const coreApi = await this.connection.getCoreApi();
 
         this.logger.debug(pp`Retrieving list of TFS projects...`);
 
         const allProjects = await coreApi.getProjects();
 
+        for (let project of allProjects) {
+            if (project.name != null) {
+                this.cache.setProject(project.name, project);
+            }
+        }
+
         this.logger.debug(pp`  > Found ${allProjects.length} projects.`);
 
-        const selectedProject = allProjects.find(project => project.name != null && project.name.localeCompare(name, void 0, { sensitivity: 'accent' }) == 0);
+        selectedProject = allProjects.find(project => project.name != null && project.name.localeCompare(name, void 0, { sensitivity: 'accent' }) == 0);
 
         this.logger.debug(pp`  > Found ${selectedProject?.id} matching projects with config.`);
 
@@ -63,20 +75,28 @@ export class AzureClient {
 
     @ProfileAsync('getWorkItems')
     public async getWorkItemsById(ids: number[]): Promise<WorkItem[]> {
+        const semaphore = new Semaphore(8);
+
         const witApi = await this.connection.getWorkItemTrackingApi();
 
         const chunkSize = 200;
+
+        const chunks: Promise<WorkItem[]>[] = [];
 
         const workItems: WorkItem[] = [];
 
         for (let i = 0; i < ids.length; i += chunkSize) {
             const chunkIds: number[] = ids.slice(i, i + chunkSize);
 
-            const workItemsChunk = await witApi.getWorkItemsBatch({
+            const workItemsChunk = semaphore.use(() => witApi.getWorkItemsBatch({
                 ids: chunkIds,
                 $expand: WorkItemExpand.Relations,
-            });
+            }));
 
+            chunks.push(workItemsChunk);
+        }
+
+        for (let workItemsChunk of await Promise.all(chunks)) {
             workItems.push(...workItemsChunk);
         }
 
@@ -222,7 +242,7 @@ export class AzureClient {
             for (const child of childrenBacklog) {
                 let parentId: number | null = null;
 
-                for (const rel of child.workItem.relations!) {
+                for (const rel of child.workItem.relations || []) {
                     if (rel.attributes?.name !== "Parent") {
                         continue;
                     }
@@ -272,7 +292,8 @@ export class AzureClient {
                     parent.workItem = wi;
                     parent.updateRelations();
 
-                    // TODO Insert respecting the order of the query
+                    // Insert any lazyli fetched parents at the end.
+                    // If an order-by clause is specified, they will be sorted later according to it
                     parentWorkItems.push(parent);
                 }
             }
@@ -309,11 +330,13 @@ export class AzureClient {
         return workItemTypes;
     }
 
+    // Example of URL:
+    // https://tfs-projects.cmf.criticalmanufacturing.com/ImplementationProjects/24b0b677-01e3-4b83-b85e-048e53f7a098/_apis/wit/attachments/a8e5f541-5b7e-4d15-b05d-b44876f4a5d4?fileName=image.png
+    // <DeploymentUrl>/<ProjectId>/_apis/wit/attachments/<AttachmentId>?fileName=<FileName>
+    static ATTACHMENT_URL_REGEX = /(?<projectId>[a-zA-Z0-9\-]+)\/_apis\/wit\/attachments\/(?<attachmentId>[a-zA-Z0-9\-]+)\?fileName=(?<fileName>[^&]+)/;
+
     public parseAttachmentUrl(url: string): { projectId: string, attachmentId: string, fileName: string } | null {
-        // Example of URL:
-        // https://tfs-projects.cmf.criticalmanufacturing.com/ImplementationProjects/24b0b677-01e3-4b83-b85e-048e53f7a098/_apis/wit/attachments/a8e5f541-5b7e-4d15-b05d-b44876f4a5d4?fileName=image.png
-        // <DeploymentUrl>/<ProjectId>/_apis/wit/attachments/<AttachmentId>?fileName=<FileName>
-        const urlRegex = /(?<projectId>[a-zA-Z0-9\-]+)\/_apis\/wit\/attachments\/(?<attachmentId>[a-zA-Z0-9\-]+)\?fileName=(?<fileName>[^&]+)/;
+        const urlRegex = AzureClient.ATTACHMENT_URL_REGEX;
 
         const match = url.match(urlRegex);
 
@@ -333,9 +356,19 @@ export class AzureClient {
         const urlObj = this.parseAttachmentUrl(url);
 
         if (urlObj) {
-            const witApi = await this.connection.getWorkItemTrackingApi();
+            let content = await this.cache.getAttachment(urlObj.projectId, urlObj.attachmentId);
 
-            return await witApi.getAttachmentContent(urlObj.attachmentId, urlObj.fileName, urlObj.projectId, /* download: */ true);
+            if (content == null) {
+                const witApi = await this.connection.getWorkItemTrackingApi();
+
+                var readable = await witApi.getAttachmentContent(urlObj.attachmentId, urlObj.fileName, urlObj.projectId, /* download: */ true);
+
+                content = await streamToBuffer(readable);
+
+                this.cache.setAttachment(urlObj.projectId, urlObj.attachmentId, content);
+            }
+
+            return bufferToStream(content);
         }
 
         return null;
@@ -346,11 +379,19 @@ export class AzureClient {
         const urlObj = this.parseAttachmentUrl(url);
 
         if (urlObj) {
-            const witApi = await this.connection.getWorkItemTrackingApi();
+            let content = await this.cache.getAttachment(urlObj.projectId, urlObj.attachmentId);
 
-            const stream = await witApi.getAttachmentContent(urlObj.attachmentId, urlObj.fileName, urlObj.projectId, /* download: */ true);
+            if (content == null) {
+                const witApi = await this.connection.getWorkItemTrackingApi();
 
-            return `data:image/${path.extname(urlObj.fileName).slice(1)};base64,` + await streamToBase64(stream);
+                var contentStream = await witApi.getAttachmentContent(urlObj.attachmentId, urlObj.fileName, urlObj.projectId, /* download: */ true);
+
+                content = await streamToBuffer(contentStream);
+
+                this.cache.setAttachment(urlObj.projectId, urlObj.attachmentId, content);
+            }
+
+            return `data:image/${path.extname(urlObj.fileName).slice(1)};base64,` + bufferToBase64(content);
         }
 
         return null;
