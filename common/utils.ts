@@ -84,7 +84,7 @@ export function bufferToStream(buffer: Buffer): NodeJS.ReadableStream {
 
 export function humanizeDuration(duration: number): { value: number, unit: 'µs' | 'ms' | 'sec' | 'min' | 'h' } {
     if (duration < 1) {
-        return { value: (duration % 1 * 1000), unit: 'µs' };
+        return { value: round(duration % 1 * 1000), unit: 'µs' };
     } else if (duration < 1000) {
         return { value: round(duration), unit: 'ms' };
     } else if (duration < 1000 * 60) {

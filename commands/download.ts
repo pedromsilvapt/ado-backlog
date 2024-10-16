@@ -130,7 +130,7 @@ export class DownloadCommand extends Command {
 
             const workItemTypes = await azure.getWorkItemTypes(project.id!);
 
-            const workItemStateColors = await azure.getWorkItemStates(project.name!);
+            const workItemStateColors = await azure.getWorkItemStates(project.name!, workItemTypes.map(t => t.name));
 
             const views: Record<string, number[]> = {};
 

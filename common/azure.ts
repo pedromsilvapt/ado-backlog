@@ -1,7 +1,7 @@
 import assert from 'assert';
 import * as azdev from "azure-devops-node-api";
 import { TeamProjectReference } from 'azure-devops-node-api/interfaces/CoreInterfaces';
-import { QueryExpand, QueryHierarchyItem, WorkItem, WorkItemExpand } from 'azure-devops-node-api/interfaces/WorkItemTrackingInterfaces';
+import { QueryExpand, QueryHierarchyItem, WorkItem, WorkItemExpand, WorkItemTypeStateColors } from 'azure-devops-node-api/interfaces/WorkItemTrackingInterfaces';
 import { IWorkItemTrackingApi } from 'azure-devops-node-api/WorkItemTrackingApi';
 import { LoggerInterface, pp } from 'clui-logger';
 import * as path from 'path';
@@ -24,7 +24,7 @@ export class AzureClient {
 
     public config: TfsConfig;
 
-    public metrics: Record<'getProjectByName' | 'query' | 'getWorkItems' | 'downloadAttachment', Metric>;
+    public metrics: Record<'getProjectByName' | 'query' | 'getWorkItems' | 'getWorkItemTypes' | 'getWorkItemStates' | 'downloadAttachment', Metric>;
 
     public constructor(logger: LoggerInterface, cache: Cache, config: TfsConfig, metrics: IMetricsContainer) {
         this.logger = logger;
@@ -39,7 +39,7 @@ export class AzureClient {
             }
         );
 
-        this.metrics = metrics.create(['getProjectByName', 'query', 'getWorkItems', 'downloadAttachment'] as const);
+        this.metrics = metrics.create(['getProjectByName', 'query', 'getWorkItems', 'getWorkItemTypes', 'getWorkItemStates', 'downloadAttachment'] as const);
 
         // Settings.defaultZone = config.timeZone;
     }
@@ -309,10 +309,19 @@ export class AzureClient {
         return parentWorkItems;
     }
 
+    @ProfileAsync('getWorkItemTypes')
     public async getWorkItemTypes(projectId: string): Promise<BacklogWorkItemType[]> {
-        const witApi = await this.connection.getWorkItemTrackingApi();
+        this.logger.debug(pp`Get workitem types for project ${projectId}`);
 
-        const workItemTypes: BacklogWorkItemType[] = [];
+        let workItemTypes = await this.cache.getWorkItemTypes(projectId);
+
+        if (workItemTypes != null) {
+            return workItemTypes;
+        }
+
+        workItemTypes = [];
+
+        const witApi = await this.connection.getWorkItemTrackingApi();
 
         const types = await witApi.getWorkItemTypes(projectId);
 
@@ -326,6 +335,8 @@ export class AzureClient {
 
             workItemTypes.push(new BacklogWorkItemType(type.name!, type.color!, icon));
         }
+
+        this.cache.setWorkItemTypes(projectId, workItemTypes);
 
         return workItemTypes;
     }
@@ -397,14 +408,32 @@ export class AzureClient {
         return null;
     }
 
-    public async getWorkItemStates(projectName: string) {
+    @ProfileAsync('getWorkItemStates')
+    public async getWorkItemStates(projectName: string, types: string[]) {
+        this.logger.debug(pp`Get workitem states for project ${projectName}`);
+
+        let workItemStateColors = await this.cache.getWorkItemStates(projectName, types);
+
+        if (workItemStateColors != null) {
+            return workItemStateColors;
+        }
+
+        workItemStateColors = {};
+
+        const getTypeStates = async (type: string): Promise<WorkItemTypeStateColors> => {
+            const stateColors = await witApi.getWorkItemTypeStates(projectName, type);
+
+            return {
+                workItemTypeName: type,
+                stateColors
+            };
+        };
+
         const witApi = await this.connection.getWorkItemTrackingApi();
 
-        const result = await witApi.getWorkItemStateColors([projectName]);
+        const result = await Promise.all(types.map(type => getTypeStates(type)));
 
-        const workItemStateColors: Record<string, Record<string, string>> = {};
-
-        for (const workItemType of result[0].workItemTypeStateColors!) {
+        for (const workItemType of result) {
             const stateColors: Record<string, string> = {};
 
             for (const state of workItemType.stateColors!) {
@@ -413,6 +442,8 @@ export class AzureClient {
 
             workItemStateColors[workItemType.workItemTypeName!] = stateColors;
         }
+
+        this.cache.setWorkItemStates(projectName, types, workItemStateColors);
 
         return workItemStateColors;
     }

@@ -1,4 +1,5 @@
 import { TeamProjectReference } from 'azure-devops-node-api/interfaces/CoreInterfaces';
+import { BacklogWorkItemType } from './model';
 import Keyv from 'keyv';
 import KeyvFile from 'keyv-file';
 
@@ -68,6 +69,46 @@ export class Cache {
         }
 
         this.cache.set(this.getProjectKey(projectName), object);
+    }
+
+    protected getWorkItemTypesKey(projectId: string): string {
+        return `getWorkItemTypesKey:${projectId}`;
+    }
+
+    public getWorkItemTypes(projectId: string): Promise<BacklogWorkItemType[] | undefined> {
+        if (this.mode == CacheMode.Off) {
+            return Promise.resolve(void 0);
+        }
+
+        return this.cache.get<BacklogWorkItemType[]>(this.getWorkItemTypesKey(projectId));
+    }
+
+    public async setWorkItemTypes(projectId: string, object: BacklogWorkItemType[]) {
+        if (this.mode == CacheMode.Off) {
+            return Promise.resolve();
+        }
+
+        this.cache.set(this.getWorkItemTypesKey(projectId), object);
+    }
+
+    protected getWorkItemStatesKey(projectName: string, types: string[]): string {
+        return `getWorkItemStates:${projectName}:${types.join(',')}`;
+    }
+
+    public getWorkItemStates(projectName: string, types: string[]): Promise<Record<string, Record<string, string>> | undefined> {
+        if (this.mode == CacheMode.Off) {
+            return Promise.resolve(void 0);
+        }
+
+        return this.cache.get<Record<string, Record<string, string>>>(this.getWorkItemStatesKey(projectName, types));
+    }
+
+    public async setWorkItemStates(projectName: string, types: string[], object: Record<string, Record<string, string>>) {
+        if (this.mode == CacheMode.Off) {
+            return Promise.resolve();
+        }
+
+        this.cache.set(this.getWorkItemStatesKey(projectName, types), object);
     }
 }
 

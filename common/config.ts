@@ -277,9 +277,6 @@ export class TemplateMetadataRowConfig {
 export type TemplateMetadataCellConfig = TemplateMetadataRowConfig | TemplateMetadataColumnConfig;
 
 export class TemplateMetadataConfig {
-    @Optional() @Property("header", String)
-    header!: string;
-
     @Property("columns", Number)
     columns!: number;
 
