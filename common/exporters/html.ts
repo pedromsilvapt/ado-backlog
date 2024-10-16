@@ -1,10 +1,9 @@
-import { BacklogWorkItem, BacklogWorkItemType } from '../model';
+import { BacklogWorkItem } from '../model';
 import { createReadStream } from 'fs';
 import { Exporter, ExporterOptions } from './exporter';
 import { TableCellAlignment, TableOfContentsMode, TemplateBlockConfig, TemplateConfig, TemplateLinksConfig, TemplateMetadataColumnConfig, TemplateMetadataConfig, TemplateMetadataRowConfig, TemplateSectionConfig, TemplateTagsConfig } from '../config';
 import { streamToBase64 } from '../utils';
 import { pp } from 'clui-logger';
-import TurndownService from 'turndown';
 import marked from 'marked';
 import * as fs from 'fs/promises';
 import * as he from 'he';
@@ -16,7 +15,7 @@ import * as path from 'path';
 export class HTMLExporter extends Exporter {
     public readonly name: string = 'html';
 
-    protected turndownService = new TurndownService();
+    protected _workItemIconName: Record<string, string> = {};
 
     public accepts(output: string): boolean {
         const outputLower = output.toLowerCase();
@@ -60,8 +59,11 @@ export class HTMLExporter extends Exporter {
         <head>
         <meta charset="UTF-8">
         <title>${this.backlog.config.name}</title>
-        <style>${HTMLStylesheetAir}</style>
-        </head>
+        <style>${HTMLStylesheetAir}</style>\n`);
+
+        this.exportIconStyles(buffer);
+
+        buffer.push(`</head>
         <body>\n`);
 
         await this.exportBrands(buffer);
@@ -93,20 +95,67 @@ export class HTMLExporter extends Exporter {
         await fs.writeFile(output, buffer.join(''), { encoding: 'utf8' });
     }
 
-    public tagIcon = `<svg version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" xmlns:xlink="http://www.w3.org/1999/xlink" enable-background="new 0 0 512 512">
+    public tagIcon = 'tag';
+
+    public tagIconBody = `<svg version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" xmlns:xlink="http://www.w3.org/1999/xlink" enable-background="new 0 0 512 512">
     <g>
       <path d="m368.4,90.3c-30.3,0-54.9,24.6-54.9,54.9s24.6,54.9 54.9,54.9c30.3,0 54.9-24.6 54.9-54.9s-24.6-54.9-54.9-54.9zm0,69.1c-7.8,0-14.2-6.3-14.2-14.2s6.3-14.2 14.2-14.2c7.8,0 14.2,6.3 14.2,14.2s-6.4,14.2-14.2,14.2z"/>
       <path d="m54.4,312.2l142.4,144.5 262.8-259-22.9-119.7-119.4-24.8-262.9,259h2.13163e-14zm142.4,188c-9.2,0-17.9-3.6-24.4-10.2l-151.6-153.9c-13.2-13.4-13.1-35.1 0.4-48.4l270-266c8.1-8 19.9-11.5 31-9.1l127,26.4c13.6,2.8 24,13.5 26.7,27.1l24.5,127.4c2.2,11.3-1.4,22.8-9.6,30.9l-270,266c-6.4,6.3-15,9.8-24,9.8z"/>
     </g>
   </svg>`;
 
-    public expandIcon = `<svg fill="#000000" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><g id="SVGRepo_bgCarrier" stroke-width="0"></g><g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"></g><g id="SVGRepo_iconCarrier"> <g> <path d="M12.36,1H3.64A2.64,2.64,0,0,0,1,3.64v8.72A2.64,2.64,0,0,0,3.64,15h8.72A2.64,2.64,0,0,0,15,12.36V3.64A2.64,2.64,0,0,0,12.36,1ZM13.6,12.36a1.25,1.25,0,0,1-1.24,1.24H3.64A1.25,1.25,0,0,1,2.4,12.36V3.64A1.25,1.25,0,0,1,3.64,2.4h8.72A1.25,1.25,0,0,1,13.6,3.64ZM8.7,4H7.3V7.31H4v1.4H7.3V12H8.7V8.71H12V7.31H8.7Z"></path> </g> </g></svg>`;
+    public expandIcon = 'expand';
 
-    public collapseIcon = `<svg fill="#000000" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><g id="SVGRepo_bgCarrier" stroke-width="0"></g><g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"></g><g id="SVGRepo_iconCarrier"> <g> <path d="M12.36,1H3.64A2.64,2.64,0,0,0,1,3.64v8.72A2.64,2.64,0,0,0,3.64,15h8.72A2.64,2.64,0,0,0,15,12.36V3.64A2.64,2.64,0,0,0,12.36,1ZM13.6,12.36a1.25,1.25,0,0,1-1.24,1.24H3.64A1.25,1.25,0,0,1,2.4,12.36V3.64A1.25,1.25,0,0,1,3.64,2.4h8.72A1.25,1.25,0,0,1,13.6,3.64ZM4,8.71h8V7.31H4Z"></path> </g> </g></svg>`;
+    public expandIconBody = `<svg fill="#000000" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><g id="SVGRepo_bgCarrier" stroke-width="0"></g><g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"></g><g id="SVGRepo_iconCarrier"> <g> <path d="M12.36,1H3.64A2.64,2.64,0,0,0,1,3.64v8.72A2.64,2.64,0,0,0,3.64,15h8.72A2.64,2.64,0,0,0,15,12.36V3.64A2.64,2.64,0,0,0,12.36,1ZM13.6,12.36a1.25,1.25,0,0,1-1.24,1.24H3.64A1.25,1.25,0,0,1,2.4,12.36V3.64A1.25,1.25,0,0,1,3.64,2.4h8.72A1.25,1.25,0,0,1,13.6,3.64ZM8.7,4H7.3V7.31H4v1.4H7.3V12H8.7V8.71H12V7.31H8.7Z"></path> </g> </g></svg>`;
 
-    protected getIcon(iconSvg: string, size: number = 13): string {
+    public collapseIcon = 'collapse';
+
+    public collapseIconBody = `<svg fill="#000000" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><g id="SVGRepo_bgCarrier" stroke-width="0"></g><g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"></g><g id="SVGRepo_iconCarrier"> <g> <path d="M12.36,1H3.64A2.64,2.64,0,0,0,1,3.64v8.72A2.64,2.64,0,0,0,3.64,15h8.72A2.64,2.64,0,0,0,15,12.36V3.64A2.64,2.64,0,0,0,12.36,1ZM13.6,12.36a1.25,1.25,0,0,1-1.24,1.24H3.64A1.25,1.25,0,0,1,2.4,12.36V3.64A1.25,1.25,0,0,1,3.64,2.4h8.72A1.25,1.25,0,0,1,13.6,3.64ZM4,8.71h8V7.31H4Z"></path> </g> </g></svg>`;
+
+    protected getIcon(iconName: string, size: number = 13): string {
         // **NOTE** Important one white space at the end!
-        return `<span style="display: inline-block; width: ${size}px; height: ${size}px">${iconSvg}</span> `;
+        return `<span class="icon icon-${iconName}" style="width: ${size}px; height: ${size}px"></span> `;
+    }
+
+    protected getWIIcon(workItemName: string, size: number = 13): string {
+        var slugName = this._workItemIconName[workItemName];
+
+        return this.getIcon('wi-' + slugName, size);
+    }
+
+    protected exportIconSvgStyle(buffer: string[], name: string, iconSvg: string) {
+        const encodedSvg = encodeURIComponent(iconSvg);
+
+        buffer.push(`.icon.icon-${name} {
+            background-image: url("data:image/svg+xml,${encodedSvg}");
+        }\n\n`);
+    }
+
+    protected exportIconStyles(buffer: string[]) {
+        buffer.push(`<style>\n`);
+
+        buffer.push(`.icon {
+            background-size: cover;
+            display: inline-block;
+        }\n\n`);
+
+        this.exportIconSvgStyle(buffer, this.tagIcon, this.tagIconBody);
+
+        this.exportIconSvgStyle(buffer, this.expandIcon, this.expandIconBody);
+
+        this.exportIconSvgStyle(buffer, this.collapseIcon, this.collapseIconBody);
+
+        for (const workItemType of this.backlog.workItemTypes) {
+            // TODO Better replace of other possible special characters that are not valid css class names
+            var slugName = workItemType.name.replace(' ', '-').toLowerCase();
+
+            // TODO Save slugName associated with work item type
+            this._workItemIconName[workItemType.name] = slugName;
+
+            this.exportIconSvgStyle(buffer, 'wi-' + slugName, workItemType.icon);
+        }
+
+        buffer.push(`</style>\n`);
     }
 
     protected async exportWorkItemField(buffer: string[], workItem: BacklogWorkItem, field: string, richText: boolean = false) {
@@ -181,7 +230,7 @@ export class HTMLExporter extends Exporter {
 
         for (const wit of this.backlog.getDistinctUsedWorkItemTypes()) {
             buffer.push(`<span title=${JSON.stringify(wit.name)}>`);
-            buffer.push(this.getIcon(wit.icon));
+            buffer.push(this.getWIIcon(wit.name));
             buffer.push(`</span>`);
         }
 
@@ -313,7 +362,7 @@ export class HTMLExporter extends Exporter {
 
                 buffer.push(`
                     <td class="data-grid-caret-column" style="padding-left: ${16 * (depth + 1)}px">
-                        ${this.getIcon(workItemType.icon)} ${wi.id} <a href="#${wi.id}">${he.encode(wi.title)}</a>
+                        ${this.getWIIcon(workItemType.name)} ${wi.id} <a href="#${wi.id}">${he.encode(wi.title)}</a>
                     </td>
                 `);
 
@@ -370,7 +419,7 @@ export class HTMLExporter extends Exporter {
                 const workItemType = this.backlog.getWorkItemType(wi.type);
 
                 buffer.push(`<li style="list-style-type: none">
-                ${this.getIcon(workItemType.icon)} ${wi.id} <a href="#${wi.id}">${he.encode(wi.title)}</a></li>`)
+                ${this.getWIIcon(workItemType.name)} ${wi.id} <a href="#${wi.id}">${he.encode(wi.title)}</a></li>`)
 
                 if (wi.hasChildren && wi.children.length > 0) {
                     buffer.push(`<ul style="margin-top: 5px;">`);
@@ -435,7 +484,7 @@ export class HTMLExporter extends Exporter {
 
         buffer.push(`<article class="workitem ${workItem.typeSlug}" id="${workItem.id}" data-wi-id="${workItem.id}" data-wi-title=${JSON.stringify(workItem.title)} class="workitem ${workItem.typeSlug}">\n`);
         buffer.push(`<p style="margin-bottom: 0; margin-top: 0;">
-        ${this.getIcon(workItemType.icon)}
+        ${this.getWIIcon(workItemType.name)}
         ${workItem.type.toUpperCase()} ${workItem.id}
         </p>\n`);
         buffer.push(`<h${level}>${workItem.title}</h${level}>\n`);
@@ -493,7 +542,7 @@ export class HTMLExporter extends Exporter {
                 const workItemType = this.backlog.getWorkItemType(relatedWorkItem.type);
 
                 buffer.push(`
-                    ${this.getIcon(workItemType.icon)} <span style="color: #868686">${relatedWorkItem.id}</span> <a href="#${relatedWorkItem.id}">${he.encode(relatedWorkItem.title)}</a>
+                    ${this.getWIIcon(workItemType.name)} <span style="color: #868686">${relatedWorkItem.id}</span> <a href="#${relatedWorkItem.id}">${he.encode(relatedWorkItem.title)}</a>
                 `);
 
                 if (!options.inline) {
@@ -511,7 +560,7 @@ export class HTMLExporter extends Exporter {
 
                     buffer.push(`
                         <li style="list-style-type: none">
-                        ${this.getIcon(workItemType.icon)} <span style="color: #868686">${relatedWorkItem.id}</span> <a href="#${relatedWorkItem.id}">${he.encode(relatedWorkItem.title)}</a></li>
+                        ${this.getWIIcon(workItemType.name)} <span style="color: #868686">${relatedWorkItem.id}</span> <a href="#${relatedWorkItem.id}">${he.encode(relatedWorkItem.title)}</a></li>
                     `);
                 }
                 buffer.push(`
