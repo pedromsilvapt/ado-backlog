@@ -1,6 +1,6 @@
 import { BacklogWorkItem } from '../model';
 import { createReadStream } from 'fs';
-import { ArrayOutputBuffer, Exporter, ExporterOptions, FileOutputBuffer, OutputBuffer } from './exporter';
+import { ArrayOutputBuffer, Exporter, ExporterOptions, FileOutputBuffer, OutputBuffer, StringOutputBuffer } from './exporter';
 import { TableCellAlignment, TableOfContentsMode, TemplateBlockConfig, TemplateConfig, TemplateLinksConfig, TemplateMetadataColumnConfig, TemplateMetadataConfig, TemplateMetadataRowConfig, TemplateSectionConfig, TemplateTagsConfig } from '../config';
 import { streamToBase64 } from '../utils';
 import { pp } from 'clui-logger';
@@ -165,7 +165,7 @@ export class HTMLExporter extends Exporter {
         if (value != null && value != "") {
             // TODO Remove hard-coded type validation
             if (field == 'System.State') {
-                const color = this.backlog.workItemStateColors[workItem.type][value];
+                const color = this.backlog.workItemStateColors[workItem.typeName][value];
 
                 const escapedValue = he.encode(value);
 
@@ -178,8 +178,9 @@ export class HTMLExporter extends Exporter {
 
                 buffer.write(`<span title=${JSON.stringify(longDate)}>${shortDate}</span>`)
             } else if (richText) {
-                var dom = cheerio.load(value ?? '');
+                let dom = cheerio.load(value ?? '');
 
+                let mutated = false;
                 for (const imgElem of dom('img')) {
                     var src = dom(imgElem).attr('src');
 
@@ -189,11 +190,17 @@ export class HTMLExporter extends Exporter {
 
                         if (imageStream != null) {
                             dom(imgElem).attr('src', imageStream);
+
+                            mutated = true;
                         }
                     }
                 }
 
-                buffer.write(dom.html());
+                if (mutated) {
+                    buffer.write(dom.html());
+                } else {
+                    buffer.write(value ?? '');
+                }
             } else if (typeof value === 'string') {
                 const escapedValue = he.encode(value);
                 const escapedValueSingleLine = escapedValue.replace('\n', '');
@@ -351,7 +358,7 @@ export class HTMLExporter extends Exporter {
 
         await this.backlog.visitAsync(async (wi, end) => {
             if (!end) {
-                const workItemType = this.backlog.getWorkItemType(wi.type);
+                const workItemType = wi.type;
 
                 if (ancestors.length == 0) {
                     buffer.write(`<tr data-grid-row-id="${wi.id}" data-grid-row-level="${depth}">`);
@@ -417,7 +424,7 @@ export class HTMLExporter extends Exporter {
         buffer.write(`<ul id="toc-list" style="margin-top: 5px;" class="collapsible-list">`);
         this.backlog.visit((wi, end) => {
             if (!end) {
-                const workItemType = this.backlog.getWorkItemType(wi.type);
+                const workItemType = wi.type;
 
                 buffer.write(`<li style="list-style-type: none">
                 ${this.getWIIcon(workItemType.name)} ${wi.id} <a href="#${wi.id}">${he.encode(wi.title)}</a></li>`)
@@ -481,12 +488,12 @@ export class HTMLExporter extends Exporter {
     protected async exportWorkItemTemplate(buffer: OutputBuffer, template: TemplateConfig, workItem: BacklogWorkItem) {
         const level = 2;
 
-        const workItemType = this.backlog.getWorkItemType(workItem.type);
+        const workItemType = workItem.type;
 
         buffer.write(`<article class="workitem ${workItem.typeSlug}" id="${workItem.id}" data-wi-id="${workItem.id}" data-wi-title=${JSON.stringify(workItem.title)} class="workitem ${workItem.typeSlug}">\n`);
         buffer.write(`<p style="margin-bottom: 0; margin-top: 0;">
         ${this.getWIIcon(workItemType.name)}
-        ${workItem.type.toUpperCase()} ${workItem.id}
+        ${workItem.typeName.toUpperCase()} ${workItem.id}
         </p>\n`);
         buffer.write(`<h${level}>${workItem.title}</h${level}>\n`);
 
@@ -540,7 +547,7 @@ export class HTMLExporter extends Exporter {
 
                 const relatedWorkItem = links[0];
 
-                const workItemType = this.backlog.getWorkItemType(relatedWorkItem.type);
+                const workItemType = relatedWorkItem.type;
 
                 buffer.write(`
                     ${this.getWIIcon(workItemType.name)} <span style="color: #868686">${relatedWorkItem.id}</span> <a href="#${relatedWorkItem.id}">${he.encode(relatedWorkItem.title)}</a>
@@ -557,7 +564,7 @@ export class HTMLExporter extends Exporter {
                     <ul style="margin-top: 5px;">\n`);
 
                 for (const relatedWorkItem of links) {
-                    const workItemType = this.backlog.getWorkItemType(relatedWorkItem.type);
+                    const workItemType = relatedWorkItem.type;
 
                     buffer.write(`
                         <li style="list-style-type: none">
@@ -572,7 +579,7 @@ export class HTMLExporter extends Exporter {
     }
 
     protected async exportWorkItemTemplateSection(buffer: OutputBuffer, block: TemplateSectionConfig, workItem: BacklogWorkItem, level: number, options : BlockRenderOptions) {
-        var fieldBuffer = new ArrayOutputBuffer();
+        var fieldBuffer = new StringOutputBuffer();
 
         await this.exportWorkItemField(fieldBuffer, workItem, block.field, block.richText);
 
@@ -587,7 +594,7 @@ export class HTMLExporter extends Exporter {
                 }
             }
 
-            buffer.write(...fieldBuffer.buffer);
+            buffer.write(fieldBuffer.buffer);
 
             buffer.write(`</section>`);
         }
@@ -597,7 +604,7 @@ export class HTMLExporter extends Exporter {
         const columns = block.columns;
 
         const cells = (await Promise.all(block.cells.map(async cell => {
-            const cellBuffer = new ArrayOutputBuffer();
+            const cellBuffer = new StringOutputBuffer();
 
             if (cell.blocks) {
                 for (const block of cell.blocks) {
@@ -667,7 +674,7 @@ export class HTMLExporter extends Exporter {
                 }
 
                 buffer.write(`<td colspan="${columnSpan}">`);
-                buffer.write(...cellBuffer.buffer);
+                buffer.write(cellBuffer.buffer);
                 buffer.write(`</td>`);
 
                 columnOffset += columnSpan;
@@ -687,10 +694,10 @@ export class HTMLExporter extends Exporter {
     }
 
     protected async exportWorkItem(buffer: OutputBuffer, workItem: BacklogWorkItem, level: number = 1) {
-        const template = this.templates.find(tpl => tpl.workItemType == workItem.type);
+        const template = this.templates.find(tpl => tpl.workItemType == workItem.typeName);
 
         if (template == null) {
-            throw new Error(`Could not find template "${workItem.type}"`);
+            throw new Error(`Could not find template "${workItem.typeName}"`);
         }
 
         await this.exportWorkItemTemplate(buffer, template, workItem);

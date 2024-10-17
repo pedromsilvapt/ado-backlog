@@ -130,22 +130,22 @@ export class Backlog {
         return workItems;
     }
 
-    public getWorkItemType(typeName: string) {
-        const workItemType = this.workItemTypes.find(type => type.name == typeName);
+    // public getWorkItemType(typeName: string) {
+    //     const workItemType = this.workItemTypes.find(type => type.name == typeName);
 
-        if (workItemType == null) {
-            throw new Error(`No work item type found for '${typeName}'`);
-        }
+    //     if (workItemType == null) {
+    //         throw new Error(`No work item type found for '${typeName}'`);
+    //     }
 
-        return workItemType;
-    }
+    //     return workItemType;
+    // }
 
     public getDistinctUsedWorkItemTypes(): BacklogWorkItemType[] {
         const usedWorkItemTypes: BacklogWorkItemType[] = [];
 
         this.visit(wi => {
-            if (usedWorkItemTypes.findIndex(type => type.name == wi.type) < 0) {
-                usedWorkItemTypes.push(this.getWorkItemType(wi.type));
+            if (usedWorkItemTypes.findIndex(type => type.name == wi.typeName) < 0) {
+                usedWorkItemTypes.push(wi.type);
             }
         });
 
@@ -158,6 +158,7 @@ export class BacklogWorkItem {
     public hasChildren: boolean;
     public children: BacklogWorkItem[];
     public relations!: BacklogWorkItemRelation[];
+    public type!: BacklogWorkItemType;
 
     public get id(): number {
         const id = this.workItem.id;
@@ -179,7 +180,7 @@ export class BacklogWorkItem {
         return title.trim();
     }
 
-    public get type(): string {
+    public get typeName(): string {
         const type = this.workItem?.fields?.["System.WorkItemType"];
 
         if (type === null || type === void 0) {
@@ -190,17 +191,17 @@ export class BacklogWorkItem {
     }
 
     public get state(): string {
-        const type = this.workItem?.fields?.["System.State"];
+        const state = this.workItem?.fields?.["System.State"];
 
-        if (type === null || type === void 0) {
+        if (state === null || state === void 0) {
             throw new Error(`WorkItem ${this.workItem.id} has no State defined`);
         }
 
-        return type;
+        return state;
     }
 
     public get typeSlug(): string {
-        return this.type.replace(' ', '-').toLowerCase();
+        return this.typeName.replace(' ', '-').toLowerCase();
     }
 
     public get tags(): string[] | null {
@@ -213,10 +214,11 @@ export class BacklogWorkItem {
         return tags.split(";").map(str => str.trim());
     }
 
-    public constructor(workItem: WorkItem, hasChildren: boolean, children: BacklogWorkItem[] = []) {
+    public constructor(type: BacklogWorkItemType, workItem: WorkItem, hasChildren: boolean, children: BacklogWorkItem[] = []) {
         this.workItem = workItem;
         this.hasChildren = hasChildren;
         this.children = children;
+        this.type = type;
 
         this.updateRelations();
     }

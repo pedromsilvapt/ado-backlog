@@ -10,7 +10,6 @@ import { BacklogContentConfig, BacklogContentDefaultsConfig, TfsConfig } from '.
 import { IMetricsContainer, Metric, ProfileAsync } from './metrics';
 import { BacklogWorkItem, BacklogWorkItemType } from './model';
 import { bufferToBase64, bufferToStream, pflatMap, streamToBuffer, streamToString } from "./utils";
-import { Semaphore } from 'data-semaphore';
 
 const DAY_FORMAT = 'yyyyMMdd';
 const SPRINT_FORMAT = 'dd MMM';
@@ -75,39 +74,20 @@ export class AzureClient {
 
     @ProfileAsync('getWorkItems')
     public async getWorkItemsById(ids: number[]): Promise<WorkItem[]> {
-        // const semaphore = new Semaphore(8);
-
         const witApi = await this.connection.getWorkItemTrackingApi();
 
         const chunkSize = 200;
 
-        // const chunks: Promise<WorkItem[]>[] = [];
-
         const chunksCount = Math.ceil(ids.length / chunkSize);
 
         const workItems: WorkItem[] = await pflatMap([...Array(chunksCount).keys()], 8, i => {
-            const chunkIds: number[] = ids.slice(i, i + chunkSize);
+            const chunkIds: number[] = ids.slice(i * chunkSize, (i * chunkSize) + chunkSize);
 
             return witApi.getWorkItemsBatch({
                 ids: chunkIds,
                 $expand: WorkItemExpand.Relations,
             });
         });
-
-        // for (let i = 0; i < ids.length; i += chunkSize) {
-        //     const chunkIds: number[] = ids.slice(i, i + chunkSize);
-
-        //     const workItemsChunk = semaphore.use(() => witApi.getWorkItemsBatch({
-        //         ids: chunkIds,
-        //         $expand: WorkItemExpand.Relations,
-        //     }));
-
-        //     chunks.push(workItemsChunk);
-        // }
-
-        // for (let workItemsChunk of await Promise.all(chunks)) {
-        //     workItems.push(...workItemsChunk);
-        // }
 
         return workItems;
     }
@@ -194,7 +174,7 @@ export class AzureClient {
         return workItems;
     }
 
-    public async buildContent(queryResults: WorkItem[], content: BacklogContentConfig[], contentDefaults: BacklogContentDefaultsConfig): Promise<BacklogWorkItem[]> {
+    public async buildContent(queryResults: WorkItem[], workItemTypes: BacklogWorkItemType[], content: BacklogContentConfig[], contentDefaults: BacklogContentDefaultsConfig): Promise<BacklogWorkItem[]> {
         if (content.length === 0) {
             throw new Error("Cannot build content without an work item types hierarchy.");
         }
@@ -203,7 +183,7 @@ export class AzureClient {
 
         const unincludedWorkItems = new Set<number>();
 
-        const backlog = await this.buildContentListRecursive(witApi, queryResults, content, contentDefaults, unincludedWorkItems);
+        const backlog = await this.buildContentListRecursive(witApi, queryResults, workItemTypes, content, contentDefaults, unincludedWorkItems);
 
         if (unincludedWorkItems.size > 0) {
             this.logger.info(pp`List of unparented Work Items: ${Array.from(unincludedWorkItems).join(', ')}`)
@@ -212,7 +192,7 @@ export class AzureClient {
         return backlog;
     }
 
-    public async buildContentListRecursive(witApi: IWorkItemTrackingApi, queryResults: WorkItem[], contentList: BacklogContentConfig[], contentDefaults: BacklogContentDefaultsConfig, unincludedWorkItems: Set<number>): Promise<BacklogWorkItem[]> {
+    public async buildContentListRecursive(witApi: IWorkItemTrackingApi, queryResults: WorkItem[], workItemTypes: BacklogWorkItemType[], contentList: BacklogContentConfig[], contentDefaults: BacklogContentDefaultsConfig, unincludedWorkItems: Set<number>): Promise<BacklogWorkItem[]> {
         if (contentList.length === 0) {
             throw new Error("Cannot build content without an work item types hierarchy.");
         }
@@ -220,19 +200,25 @@ export class AzureClient {
         const backlog = [];
 
         for (const content of contentList) {
-            backlog.push(...await this.buildContentRecursive(witApi, queryResults, content, contentDefaults, unincludedWorkItems));
+            backlog.push(...await this.buildContentRecursive(witApi, queryResults, workItemTypes, content, contentDefaults, unincludedWorkItems));
         }
 
         return backlog;
     }
 
-    public async buildContentRecursive(witApi: IWorkItemTrackingApi, queryResults: WorkItem[], content: BacklogContentConfig, contentDefaults: BacklogContentDefaultsConfig, unincludedWorkItems: Set<number>): Promise<BacklogWorkItem[]> {
+    public async buildContentRecursive(witApi: IWorkItemTrackingApi, queryResults: WorkItem[], workItemTypes: BacklogWorkItemType[], content: BacklogContentConfig, contentDefaults: BacklogContentDefaultsConfig, unincludedWorkItems: Set<number>): Promise<BacklogWorkItem[]> {
         const hasChildren = content.content != null && content.content.length > 0;
 
         const parentTypes = content.workItemTypes;
         const parentWorkItems = queryResults
             .filter(wi => parentTypes.includes(wi.fields!["System.WorkItemType"]))
-            .map(wi => new BacklogWorkItem(wi, hasChildren));
+            .map(wi => {
+                const typeName = wi?.fields?.["System.WorkItemType"];
+
+                const type = workItemTypes.find(type => type.name == typeName)!;
+
+                return new BacklogWorkItem(type, wi, hasChildren)
+            });
 
         const fetchParents = content.fetchParents ?? contentDefaults.fetchParents;
 
@@ -247,7 +233,7 @@ export class AzureClient {
             // Only when `content.fetchParents == true`
             const unloadedParents: number[] = [];
 
-            const childrenBacklog = await this.buildContentListRecursive(witApi, queryResults, content.content, contentDefaults, unincludedWorkItems);
+            const childrenBacklog = await this.buildContentListRecursive(witApi, queryResults, workItemTypes, content.content, contentDefaults, unincludedWorkItems);
             for (const child of childrenBacklog) {
                 let parentId: number | null = null;
 
@@ -261,7 +247,7 @@ export class AzureClient {
                 }
 
                 if (parentId == null) {
-                    this.logger.warn(pp`${child.type} #${child.id} ${child.title} was skipped because it does not have a parent.`);
+                    this.logger.warn(pp`${child.typeName} #${child.id} ${child.title} was skipped because it does not have a parent.`);
                     continue;
                 }
 
@@ -273,13 +259,13 @@ export class AzureClient {
                     // After all child items have been processed, we check for any missing parents and load them in batch,
                     // filling out the missing work item objects of them
                     if (fetchParents) {
-                        parent = new BacklogWorkItem(null!, true);
+                        parent = new BacklogWorkItem(null!, null!, true);
 
                         parentsById.set(parentId, parent);
 
                         unloadedParents.push(parentId);
                     } else {
-                        this.logger.warn(child.type + pp` #${child.id} ${child.title} was skipped because its parent #${parentId} is not part of this backlog.`);
+                        this.logger.warn(child.typeName + pp` #${child.id} ${child.title} was skipped because its parent #${parentId} is not part of this backlog.`);
                         unincludedWorkItems.add(parentId);
                         continue;
                     }
@@ -298,7 +284,9 @@ export class AzureClient {
                     assert(parent.workItem == null, "work item must have been unloaded previously");
 
                     // Fill out the previously-null work item object
+                    const typeName = wi?.fields?.["System.WorkItemType"];
                     parent.workItem = wi;
+                    parent.type = workItemTypes.find(type => type.name == typeName)!;
                     parent.updateRelations();
 
                     // Insert any lazyli fetched parents at the end.

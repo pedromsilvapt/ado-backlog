@@ -127,11 +127,11 @@ export class DownloadCommand extends Command {
                 return;
             }
 
-            const tree = await azure.buildContent(queryResults, content, backlogConfig.contentDefaults);
-
             const workItemTypes = await azure.getWorkItemTypes(project.id!);
 
             const workItemStateColors = await azure.getWorkItemStates(project.name!, workItemTypes.map(t => t.name));
+
+            const tree = await azure.buildContent(queryResults, workItemTypes, content, backlogConfig.contentDefaults);
 
             const views: Record<string, number[]> = await passign(backlogConfig.views, 4, async view => {
                 logger.info(pp`Downloading query results for view ${view.name}...`);

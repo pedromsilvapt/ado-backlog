@@ -34,19 +34,56 @@ export interface ExporterOptions {
 }
 
 export interface OutputBuffer {
+    get length(): number;
+
     write(...values: string[]): void;
 }
 
 export class ArrayOutputBuffer implements OutputBuffer {
+    length: number = 0;
+
     public buffer: string[] = [];
 
     write(...values: string[]): void {
-        this.buffer.push(...values);
-    }
+        for (let v of values) {
+            if (v == null) {
+                continue;
+            }
 
+            if (typeof v != 'string') {
+                v = '' + v;
+            }
+
+            this.length += v.length;
+
+            this.buffer.push(v);
+        }
+    }
+}
+
+export class StringOutputBuffer implements OutputBuffer {
+    length: number = 0;
+
+    public buffer: string = "";
+
+    write(...values: string[]): void {
+        for (let v of values) {
+            if (v == null) continue;
+
+            if (typeof v != 'string') {
+                v = '' + v;
+            }
+
+            this.length += v.length;
+
+            this.buffer += v;
+        }
+    }
 }
 
 export class FileOutputBuffer implements OutputBuffer {
+    length: number = 0;
+
     public stream: fs.WriteStream;
 
     constructor (file: string, encoding: BufferEncoding = 'utf8') {
@@ -54,16 +91,16 @@ export class FileOutputBuffer implements OutputBuffer {
     }
 
     write(...values: string[]): void {
-        for (const v of values) {
+        for (let v of values) {
             if (v == null) {
                 continue;
             }
 
             if (typeof v != 'string') {
-                this.stream.write('' + v);
-            } else {
-                this.stream.write(v);
+                v = '' + v;
             }
+            this.stream.write(v);
+            this.length += v.length;
         }
     }
 }
