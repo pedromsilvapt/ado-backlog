@@ -93,7 +93,6 @@ export class HTMLExporter extends Exporter {
         </body>
         </html>`);
 
-        buffer.stream.write(null);
         buffer.stream.close();
     }
 

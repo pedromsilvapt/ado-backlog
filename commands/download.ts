@@ -8,6 +8,7 @@ import { HTMLExporter } from '../common/exporters/html';
 import { JsonExporter } from '../common/exporters/json';
 import { Backlog } from '../common/model';
 import { ExporterManager } from '../common/exporterManager';
+import { passign } from '../common/utils';
 import path from 'path';
 
 export class DownloadCommand extends Command {
@@ -132,14 +133,7 @@ export class DownloadCommand extends Command {
 
             const workItemStateColors = await azure.getWorkItemStates(project.name!, workItemTypes.map(t => t.name));
 
-            const views: Record<string, number[]> = {};
-
-            for (const view of backlogConfig.views) {
-                if (view.name in views) {
-                    logger.error(pp`Duplicate view with name ${view.name} found in config, skipping it.`);
-                    continue;
-                }
-
+            const views: Record<string, number[]> = await passign(backlogConfig.views, 4, async view => {
                 logger.info(pp`Downloading query results for view ${view.name}...`);
 
                 // When both the backlog and the view are retrieved using a WIQL
@@ -147,13 +141,17 @@ export class DownloadCommand extends Command {
                 if (backlogConfig.query != null && view.query != null) {
                     // NOTE: Concatenate the view query first, and only then the backlog query,
                     // to allow the backlog query to have additional clauses (such as ORDER BY)
-                    views[view.name] = await azure.getQueryResults(project, {
-                        query: `(${view.query.trim()}) AND (${backlogConfig.query.trim()})`
-                    });
+                    return {
+                        [view.name]: await azure.getQueryResults(project, {
+                                query: `(${view.query.trim()}) AND (${backlogConfig.query.trim()})`
+                        })
+                    };
                 } else {
-                    views[view.name] = await azure.getQueryResults(project, view);
+                    return {
+                        [view.name]: await azure.getQueryResults(project, view)
+                    };
                 }
-            }
+            });
 
             let outputConfigs = args.output != null
                 ? [new BacklogOutputConfig(args.output)]

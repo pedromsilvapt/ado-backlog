@@ -1,4 +1,5 @@
 import chalk from 'chalk';
+import { Semaphore } from 'data-semaphore';
 import { Readable } from 'stream';
 
 export function sum<T>(iterable: Iterable<T>, accessor: (elem: T) => number): number {
@@ -108,4 +109,31 @@ export function round(n: number, digits: number = 0): number {
     const power = Math.pow(10, digits);
 
     return Math.round(n * power) / power;
+}
+
+export function pmap<T, M>(array: T[], concurrency: number, map: (elem: T, index: number) => Promise<M>): Promise<M[]> {
+    const semaphore = new Semaphore(concurrency);
+
+    return Promise.all(array.map((elem, index) => semaphore.use(() => map(elem, index))));
+}
+
+export async function pflatMap<T, M>(array: T[], concurrency: number, map: (elem: T, index: number) => Promise<M[]>): Promise<M[]> {
+    return (await pmap(array, concurrency, map)).flat();
+}
+
+export async function peach<T>(array: T[], concurrency: number, map: (elem: T, index: number) => Promise<unknown>): Promise<void> {
+    const semaphore = new Semaphore(concurrency);
+
+    await Promise.all(array.map((elem, index) => semaphore.use(() => map(elem, index))));
+}
+
+export async function passign<T, K extends string | number | symbol, M>(array: T[], concurrency: number, map: (elem: T, index: number) => Promise<Record<K, M>>): Promise<Record<K, M>> {
+    const semaphore = new Semaphore(concurrency);
+
+    const target: Record<K, M> = {} as any;
+
+    await Promise.all(array.map((elem, index) => semaphore.use(async () =>
+        Object.assign(target, await map(elem, index)))));
+
+    return target;
 }

@@ -9,7 +9,7 @@ import { Cache } from './cache';
 import { BacklogContentConfig, BacklogContentDefaultsConfig, TfsConfig } from './config';
 import { IMetricsContainer, Metric, ProfileAsync } from './metrics';
 import { BacklogWorkItem, BacklogWorkItemType } from './model';
-import { bufferToBase64, bufferToStream, streamToBuffer, streamToString } from "./utils";
+import { bufferToBase64, bufferToStream, pflatMap, streamToBuffer, streamToString } from "./utils";
 import { Semaphore } from 'data-semaphore';
 
 const DAY_FORMAT = 'yyyyMMdd';
@@ -75,30 +75,39 @@ export class AzureClient {
 
     @ProfileAsync('getWorkItems')
     public async getWorkItemsById(ids: number[]): Promise<WorkItem[]> {
-        const semaphore = new Semaphore(8);
+        // const semaphore = new Semaphore(8);
 
         const witApi = await this.connection.getWorkItemTrackingApi();
 
         const chunkSize = 200;
 
-        const chunks: Promise<WorkItem[]>[] = [];
+        // const chunks: Promise<WorkItem[]>[] = [];
 
-        const workItems: WorkItem[] = [];
+        const chunksCount = Math.ceil(ids.length / chunkSize);
 
-        for (let i = 0; i < ids.length; i += chunkSize) {
+        const workItems: WorkItem[] = await pflatMap([...Array(chunksCount).keys()], 8, i => {
             const chunkIds: number[] = ids.slice(i, i + chunkSize);
 
-            const workItemsChunk = semaphore.use(() => witApi.getWorkItemsBatch({
+            return witApi.getWorkItemsBatch({
                 ids: chunkIds,
                 $expand: WorkItemExpand.Relations,
-            }));
+            });
+        });
 
-            chunks.push(workItemsChunk);
-        }
+        // for (let i = 0; i < ids.length; i += chunkSize) {
+        //     const chunkIds: number[] = ids.slice(i, i + chunkSize);
 
-        for (let workItemsChunk of await Promise.all(chunks)) {
-            workItems.push(...workItemsChunk);
-        }
+        //     const workItemsChunk = semaphore.use(() => witApi.getWorkItemsBatch({
+        //         ids: chunkIds,
+        //         $expand: WorkItemExpand.Relations,
+        //     }));
+
+        //     chunks.push(workItemsChunk);
+        // }
+
+        // for (let workItemsChunk of await Promise.all(chunks)) {
+        //     workItems.push(...workItemsChunk);
+        // }
 
         return workItems;
     }
