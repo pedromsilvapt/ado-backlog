@@ -1,11 +1,13 @@
 import { LoggerInterface } from 'clui-logger';
-import { BacklogConfig, TemplateConfig } from '../config';
-import { Backlog, BacklogWorkItem, BacklogWorkItemType } from '../model';
+import { TemplateConfig } from '../config';
+import { Backlog } from '../model';
 import { AzureClient } from '../azure';
+import assert from 'assert';
+import * as fs from 'fs';
 
 export abstract class Exporter {
     public abstract readonly name: string;
-    
+
     public logger: LoggerInterface;
 
     public azure: AzureClient;
@@ -29,4 +31,39 @@ export abstract class Exporter {
 export interface ExporterOptions {
     overwrite?: boolean;
     mkdir?: boolean;
+}
+
+export interface OutputBuffer {
+    write(...values: string[]): void;
+}
+
+export class ArrayOutputBuffer implements OutputBuffer {
+    public buffer: string[] = [];
+
+    write(...values: string[]): void {
+        this.buffer.push(...values);
+    }
+
+}
+
+export class FileOutputBuffer implements OutputBuffer {
+    public stream: fs.WriteStream;
+
+    constructor (file: string, encoding: BufferEncoding = 'utf8') {
+        this.stream = fs.createWriteStream(file, { encoding });
+    }
+
+    write(...values: string[]): void {
+        for (const v of values) {
+            if (v == null) {
+                continue;
+            }
+
+            if (typeof v != 'string') {
+                this.stream.write('' + v);
+            } else {
+                this.stream.write(v);
+            }
+        }
+    }
 }

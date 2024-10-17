@@ -1,6 +1,6 @@
 import { BacklogWorkItem } from '../model';
 import { createReadStream } from 'fs';
-import { Exporter, ExporterOptions } from './exporter';
+import { ArrayOutputBuffer, Exporter, ExporterOptions, FileOutputBuffer, OutputBuffer } from './exporter';
 import { TableCellAlignment, TableOfContentsMode, TemplateBlockConfig, TemplateConfig, TemplateLinksConfig, TemplateMetadataColumnConfig, TemplateMetadataConfig, TemplateMetadataRowConfig, TemplateSectionConfig, TemplateTagsConfig } from '../config';
 import { streamToBase64 } from '../utils';
 import { pp } from 'clui-logger';
@@ -53,8 +53,9 @@ export class HTMLExporter extends Exporter {
             }
         }
 
-        const buffer: string[] = [];
-        buffer.push(`<!doctype html>
+        const buffer = new FileOutputBuffer(output);
+
+        buffer.write(`<!doctype html>
         <html lang="en">
         <head>
         <meta charset="UTF-8">
@@ -63,7 +64,7 @@ export class HTMLExporter extends Exporter {
 
         this.exportIconStyles(buffer);
 
-        buffer.push(`</head>
+        buffer.write(`</head>
         <body>\n`);
 
         await this.exportBrands(buffer);
@@ -74,7 +75,7 @@ export class HTMLExporter extends Exporter {
 
         await this.exportTableOfContents(buffer);
 
-        buffer.push(`<div class="centered-layout">`);
+        buffer.write(`<div class="centered-layout">`);
 
         await this.backlog.visitAsync(wi => this.exportWorkItem(buffer, wi));
 
@@ -84,15 +85,16 @@ export class HTMLExporter extends Exporter {
 
         await this.exportFooter(buffer);
 
-        buffer.push(`</div>`);
+        buffer.write(`</div>`);
 
-        buffer.push(HTMLScript);
+        buffer.write(HTMLScript);
 
-        buffer.push(`
+        buffer.write(`
         </body>
         </html>`);
 
-        await fs.writeFile(output, buffer.join(''), { encoding: 'utf8' });
+        buffer.stream.write(null);
+        buffer.stream.close();
     }
 
     public tagIcon = 'tag';
@@ -123,18 +125,18 @@ export class HTMLExporter extends Exporter {
         return this.getIcon('wi-' + slugName, size);
     }
 
-    protected exportIconSvgStyle(buffer: string[], name: string, iconSvg: string) {
+    protected exportIconSvgStyle(buffer: OutputBuffer, name: string, iconSvg: string) {
         const encodedSvg = encodeURIComponent(iconSvg);
 
-        buffer.push(`.icon.icon-${name} {
+        buffer.write(`.icon.icon-${name} {
             background-image: url("data:image/svg+xml,${encodedSvg}");
         }\n\n`);
     }
 
-    protected exportIconStyles(buffer: string[]) {
-        buffer.push(`<style>\n`);
+    protected exportIconStyles(buffer: OutputBuffer) {
+        buffer.write(`<style>\n`);
 
-        buffer.push(`.icon {
+        buffer.write(`.icon {
             background-size: cover;
             display: inline-block;
         }\n\n`);
@@ -155,10 +157,10 @@ export class HTMLExporter extends Exporter {
             this.exportIconSvgStyle(buffer, 'wi-' + slugName, workItemType.icon);
         }
 
-        buffer.push(`</style>\n`);
+        buffer.write(`</style>\n`);
     }
 
-    protected async exportWorkItemField(buffer: string[], workItem: BacklogWorkItem, field: string, richText: boolean = false) {
+    protected async exportWorkItemField(buffer: OutputBuffer, workItem: BacklogWorkItem, field: string, richText: boolean = false) {
         const value = workItem.workItem.fields?.[field];
 
         if (value != null && value != "") {
@@ -168,14 +170,14 @@ export class HTMLExporter extends Exporter {
 
                 const escapedValue = he.encode(value);
 
-                buffer.push(`<span title="${escapedValue}"><span class="state-indicator" style="background-color: #${color}"></span> ${escapedValue}</span>`);
+                buffer.write(`<span title="${escapedValue}"><span class="state-indicator" style="background-color: #${color}"></span> ${escapedValue}</span>`);
             } else if (field == 'System.ChangedDate') {
                 var date = new Date(value);
 
                 var shortDate = date.toLocaleDateString('en-us', { weekday:"long", year:"numeric", month:"short", day:"numeric"});
                 var longDate = date.toLocaleString();
 
-                buffer.push(`<span title=${JSON.stringify(longDate)}>${shortDate}</span>`)
+                buffer.write(`<span title=${JSON.stringify(longDate)}>${shortDate}</span>`)
             } else if (richText) {
                 var dom = cheerio.load(value ?? '');
 
@@ -192,67 +194,67 @@ export class HTMLExporter extends Exporter {
                     }
                 }
 
-                buffer.push(dom.html());
+                buffer.write(dom.html());
             } else if (typeof value === 'string') {
                 const escapedValue = he.encode(value);
                 const escapedValueSingleLine = escapedValue.replace('\n', '');
 
-                buffer.push(`<span title=${JSON.stringify(escapedValueSingleLine)}>${escapedValue}</span>\n`);
+                buffer.write(`<span title=${JSON.stringify(escapedValueSingleLine)}>${escapedValue}</span>\n`);
             } else {
-                buffer.push(value ?? '');
+                buffer.write(value ?? '');
             }
         }
     }
 
-    protected async exportBrands(buffer: string[]) {
+    protected async exportBrands(buffer: OutputBuffer) {
         if (this.backlog.config.brands.length > 0) {
-            buffer.push(`<div class="brands">\n`);
+            buffer.write(`<div class="brands">\n`);
 
             for (const brand of this.backlog.config.brands) {
                 const brandStream = createReadStream(brand.logo);
 
                 const base64Brand = `data:image/${path.extname(brand.logo).slice(1)};base64,` + await streamToBase64(brandStream);
 
-                buffer.push(`<div class="brand right">
+                buffer.write(`<div class="brand right">
                     <img src="${base64Brand}" />
                 </div>`);
             }
 
-            buffer.push(`</div>\n`);
+            buffer.write(`</div>\n`);
         }
     }
 
-    protected async exportHeader(buffer: string[]) {
-        buffer.push(`<header id="top">
+    protected async exportHeader(buffer: OutputBuffer) {
+        buffer.write(`<header id="top">
         <h1>${this.backlog.config.name}</h1>
         <p style="text-align: center; margin-top: 0;"><small>${luxon.DateTime.now().toFormat("DDDD")}</small></p>
         <p style="text-align: center; margin-top: 0;">`);
 
         for (const wit of this.backlog.getDistinctUsedWorkItemTypes()) {
-            buffer.push(`<span title=${JSON.stringify(wit.name)}>`);
-            buffer.push(this.getWIIcon(wit.name));
-            buffer.push(`</span>`);
+            buffer.write(`<span title=${JSON.stringify(wit.name)}>`);
+            buffer.write(this.getWIIcon(wit.name));
+            buffer.write(`</span>`);
         }
 
-        buffer.push(`</p>\n</header>\n`);
+        buffer.write(`</p>\n</header>\n`);
     }
 
-    protected async exportViewsTabbar(buffer: string[]) {
+    protected async exportViewsTabbar(buffer: OutputBuffer) {
         const views = this.backlog.config.views;
 
         if (views.length > 0) {
-            buffer.push(`<nav id="views padding-body">
+            buffer.write(`<nav id="views padding-body">
             <p class="views tabbar" data-tab-callback="onViewSelected">\n`);
 
-            buffer.push(`<a class="tab active" data-tab-context="all">All</a>`);
+            buffer.write(`<a class="tab active" data-tab-context="all">All</a>`);
 
             for (const view of views) {
                 const workItemIds = this.backlog.views[view.name].join(',');
 
-                buffer.push(`<a class="tab" data-tab-context="${workItemIds}">${view.name}</a>`);
+                buffer.write(`<a class="tab" data-tab-context="${workItemIds}">${view.name}</a>`);
             }
 
-            buffer.push(`
+            buffer.write(`
                 </p>
                 <noscript>
                     "Views" functionality is not available without JavaScript enabled.
@@ -262,7 +264,7 @@ export class HTMLExporter extends Exporter {
         }
     }
 
-    protected async exportTableOfContents(buffer: string[]) {
+    protected async exportTableOfContents(buffer: OutputBuffer) {
         const tocConfig = this.backlog.toc;
 
         if (tocConfig.mode == TableOfContentsMode.List) {
@@ -274,7 +276,7 @@ export class HTMLExporter extends Exporter {
         }
     }
 
-    protected async exportTableOfContentsDataGrid(buffer: string[]) {
+    protected async exportTableOfContentsDataGrid(buffer: OutputBuffer) {
         const tocConfig = this.backlog.toc;
 
         const contentWorkItemTypes = Array.from(this.backlog.config.allWorkItemTypes());
@@ -320,13 +322,13 @@ export class HTMLExporter extends Exporter {
             }
         }
 
-        buffer.push(`<nav id="toc" class="padding-body">`);
+        buffer.write(`<nav id="toc" class="padding-body">`);
 
         if (!tocConfig.hideHeader) {
-            buffer.push(`<h1>Table of Contents</h1>\n`);
+            buffer.write(`<h1>Table of Contents</h1>\n`);
         }
 
-        buffer.push(`<table id="toc-grid" class="data-grid collapsible-data-grid">
+        buffer.write(`<table id="toc-grid" class="data-grid collapsible-data-grid">
             <thead>
                 <tr>
                     <th>
@@ -337,10 +339,10 @@ export class HTMLExporter extends Exporter {
 
         // For the headers, we take information from the first work item type defined in the backlog
         for (const value of tocConfig.valuesFor(contentWorkItemTypes[0])) {
-            buffer.push(`<th title=${JSON.stringify(value.header)} style="width: ${value.width ?? 'auto'}; max-width: ${value.width ?? 'auto'};">${value.header}</th>`);
+            buffer.write(`<th title=${JSON.stringify(value.header)} style="width: ${value.width ?? 'auto'}; max-width: ${value.width ?? 'auto'};">${value.header}</th>`);
         }
 
-        buffer.push(`</tr>
+        buffer.write(`</tr>
             </thead>
             <tbody>
         `);
@@ -353,32 +355,32 @@ export class HTMLExporter extends Exporter {
                 const workItemType = this.backlog.getWorkItemType(wi.type);
 
                 if (ancestors.length == 0) {
-                    buffer.push(`<tr data-grid-row-id="${wi.id}" data-grid-row-level="${depth}">`);
+                    buffer.write(`<tr data-grid-row-id="${wi.id}" data-grid-row-level="${depth}">`);
                 } else {
                     const parentWi = ancestors[ancestors.length - 1];
 
-                    buffer.push(`<tr data-grid-row-id="${wi.id}" data-grid-parent-row-id="${parentWi.id}" data-grid-row-level="${depth}">`);
+                    buffer.write(`<tr data-grid-row-id="${wi.id}" data-grid-parent-row-id="${parentWi.id}" data-grid-row-level="${depth}">`);
                 }
 
-                buffer.push(`
+                buffer.write(`
                     <td class="data-grid-caret-column" style="padding-left: ${16 * (depth + 1)}px">
                         ${this.getWIIcon(workItemType.name)} ${wi.id} <a href="#${wi.id}">${he.encode(wi.title)}</a>
                     </td>
                 `);
 
                 for (const value of tocConfig.valuesFor(workItemType.name)) {
-                    buffer.push(`<td style="text-align: ${value.align ?? TableCellAlignment.Left}">`);
+                    buffer.write(`<td style="text-align: ${value.align ?? TableCellAlignment.Left}">`);
 
                     // Only print the value of this column if there is a field name. Otherwise, print it as empty
                     if (value.field != null) {
                         await this.exportWorkItemField(buffer, wi, value.field, false);
                     }
 
-                    buffer.push(`</td>`);
+                    buffer.write(`</td>`);
                 }
 
 
-                buffer.push(`</tr>\n`);
+                buffer.write(`</tr>\n`);
 
                 depth += 1;
 
@@ -393,74 +395,74 @@ export class HTMLExporter extends Exporter {
                 }
             }
         }, /* root: */ null, /* visitEnd: */ true);
-        buffer.push(`</table>`);
+        buffer.write(`</table>`);
 
-        buffer.push(`<hr class="end-of-work-item" />
+        buffer.write(`<hr class="end-of-work-item" />
         </nav>\n`);
 
-        buffer.push(`</div>`);
+        buffer.write(`</div>`);
     }
 
-    protected async exportTableOfContentsList(buffer: string[]) {
-        buffer.push(`<div class="centered-layout">`);
+    protected async exportTableOfContentsList(buffer: OutputBuffer) {
+        buffer.write(`<div class="centered-layout">`);
 
-        buffer.push(`<nav id="toc">
+        buffer.write(`<nav id="toc">
         <h1>Table of Contents</h1>\n`);
 
-        buffer.push(`
+        buffer.write(`
         <p style="text-align: right; margin: 0; margin-bottom: 5px;">
             <span title="Expand All" data-list-action="expand-all" data-list-selector="#toc-list" class="icon-small-button">${this.getIcon(this.expandIcon)}</span>
             <span title="Collapse All" data-list-action="collapse-all" data-list-selector="#toc-list" class="icon-small-button">${this.getIcon(this.collapseIcon)}</span>
         </p>`);
 
-        buffer.push(`<ul id="toc-list" style="margin-top: 5px;" class="collapsible-list">`);
+        buffer.write(`<ul id="toc-list" style="margin-top: 5px;" class="collapsible-list">`);
         this.backlog.visit((wi, end) => {
             if (!end) {
                 const workItemType = this.backlog.getWorkItemType(wi.type);
 
-                buffer.push(`<li style="list-style-type: none">
+                buffer.write(`<li style="list-style-type: none">
                 ${this.getWIIcon(workItemType.name)} ${wi.id} <a href="#${wi.id}">${he.encode(wi.title)}</a></li>`)
 
                 if (wi.hasChildren && wi.children.length > 0) {
-                    buffer.push(`<ul style="margin-top: 5px;">`);
+                    buffer.write(`<ul style="margin-top: 5px;">`);
                 }
             } else {
                 if (wi.hasChildren && wi.children.length > 0) {
-                    buffer.push(`</ul>`);
+                    buffer.write(`</ul>`);
                 }
             }
         }, /* root: */ null, /* visitEnd: */ true);
-        buffer.push(`</ul>`);
+        buffer.write(`</ul>`);
 
-        buffer.push(`<hr class="end-of-work-item" />
+        buffer.write(`<hr class="end-of-work-item" />
         </nav>\n`);
 
-        buffer.push(`</div>`);
+        buffer.write(`</div>`);
     }
 
-    protected async exportAppendixes(buffer: string[]) {
+    protected async exportAppendixes(buffer: OutputBuffer) {
         if (this.backlog.config.appendixes.length > 0) {
             for (const appendix of this.backlog.config.appendixes) {
-                buffer.push(`<section class="appendix from-markdown">\n`);
+                buffer.write(`<section class="appendix from-markdown">\n`);
 
                 if (appendix.title != null) {
-                    buffer.push(`<h1>${he.encode(appendix.title)}</h1>\n`);
+                    buffer.write(`<h1>${he.encode(appendix.title)}</h1>\n`);
                 }
 
                 if (appendix.content != null) {
                     const tokenizer = new marked.Tokenizer();
                     tokenizer.code = (src: string): marked.Tokens.Code | undefined => { return; }
 
-                    buffer.push(`${marked.parse(appendix.content, { tokenizer })}\n`);
+                    buffer.write(`${marked.parse(appendix.content, { tokenizer })}\n`);
                 }
 
-                buffer.push(`</section>\n`);
+                buffer.write(`</section>\n`);
             }
         }
     }
 
-    protected async exportBackToTop(buffer: string[]) {
-        buffer.push(`<a id="back-to-top" href="#top">
+    protected async exportBackToTop(buffer: OutputBuffer) {
+        buffer.write(`<a id="back-to-top" href="#top">
             <svg fill="#000000" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" style="
             width: 45px;
             height: 45px;
@@ -471,33 +473,33 @@ export class HTMLExporter extends Exporter {
         </a>\n`);
     }
 
-    protected async exportFooter(buffer: string[]) {
-        buffer.push(`<footer style="text-align: center; color: gray">
+    protected async exportFooter(buffer: OutputBuffer) {
+        buffer.write(`<footer style="text-align: center; color: gray">
             Critical Manufacturing. Document generated in ${luxon.DateTime.now().toFormat("DDDD")}.
         </footer>`);
     }
 
-    protected async exportWorkItemTemplate(buffer: string[], template: TemplateConfig, workItem: BacklogWorkItem) {
+    protected async exportWorkItemTemplate(buffer: OutputBuffer, template: TemplateConfig, workItem: BacklogWorkItem) {
         const level = 2;
 
         const workItemType = this.backlog.getWorkItemType(workItem.type);
 
-        buffer.push(`<article class="workitem ${workItem.typeSlug}" id="${workItem.id}" data-wi-id="${workItem.id}" data-wi-title=${JSON.stringify(workItem.title)} class="workitem ${workItem.typeSlug}">\n`);
-        buffer.push(`<p style="margin-bottom: 0; margin-top: 0;">
+        buffer.write(`<article class="workitem ${workItem.typeSlug}" id="${workItem.id}" data-wi-id="${workItem.id}" data-wi-title=${JSON.stringify(workItem.title)} class="workitem ${workItem.typeSlug}">\n`);
+        buffer.write(`<p style="margin-bottom: 0; margin-top: 0;">
         ${this.getWIIcon(workItemType.name)}
         ${workItem.type.toUpperCase()} ${workItem.id}
         </p>\n`);
-        buffer.push(`<h${level}>${workItem.title}</h${level}>\n`);
+        buffer.write(`<h${level}>${workItem.title}</h${level}>\n`);
 
         for (const block of template.blocks) {
             await this.exportWorkItemTemplateBlock(buffer, block, workItem, level + 1, {});
         }
 
-        buffer.push(`<hr class="end-of-work-item" />\n`);
-        buffer.push(`</article>\n`);
+        buffer.write(`<hr class="end-of-work-item" />\n`);
+        buffer.write(`</article>\n`);
     }
 
-    protected async exportWorkItemTemplateBlock(buffer: string[], block: TemplateBlockConfig, workItem: BacklogWorkItem, level: number, options : BlockRenderOptions) {
+    protected async exportWorkItemTemplateBlock(buffer: OutputBuffer, block: TemplateBlockConfig, workItem: BacklogWorkItem, level: number, options : BlockRenderOptions) {
         if (block instanceof TemplateSectionConfig) {
             await this.exportWorkItemTemplateSection(buffer, block, workItem, level, options);
         } else if (block instanceof TemplateLinksConfig) {
@@ -511,92 +513,92 @@ export class HTMLExporter extends Exporter {
         }
     }
 
-    protected async exportWorkItemTemplateTags(buffer: string[], block: TemplateTagsConfig, workItem: BacklogWorkItem, level: number, options : BlockRenderOptions) {
+    protected async exportWorkItemTemplateTags(buffer: OutputBuffer, block: TemplateTagsConfig, workItem: BacklogWorkItem, level: number, options : BlockRenderOptions) {
         const tags = workItem.tags;
 
         if (tags != null && tags.length > 0) {
             const margin = options.inline ? 0 : 8;
-            buffer.push(`<section data-wi-tags style="margin-bottom: ${margin}px;">
+            buffer.write(`<section data-wi-tags style="margin-bottom: ${margin}px;">
                 <strong>Tags</strong>
                 ${this.getIcon(this.tagIcon)} ${tags.join(', ')}
             </section>`);
         }
     }
 
-    protected async exportWorkItemTemplateLinks(buffer: string[], block: TemplateLinksConfig, workItem: BacklogWorkItem, level: number, options : BlockRenderOptions) {
+    protected async exportWorkItemTemplateLinks(buffer: OutputBuffer, block: TemplateLinksConfig, workItem: BacklogWorkItem, level: number, options : BlockRenderOptions) {
         const links = this.backlog.getLinks([workItem], block.relations);
 
         if (links.length > 0) {
             if (block.single) {
-                buffer.push(`<section data-wi-links>`);
+                buffer.write(`<section data-wi-links>`);
 
                 if (!options.inline) {
-                    buffer.push(`<p style="margin-bottom: 0">`);
+                    buffer.write(`<p style="margin-bottom: 0">`);
                 }
 
-                buffer.push(`    <strong style="margin-right: 7px">${block.label}</strong>
+                buffer.write(`    <strong style="margin-right: 7px">${block.label}</strong>
                 `);
 
                 const relatedWorkItem = links[0];
 
                 const workItemType = this.backlog.getWorkItemType(relatedWorkItem.type);
 
-                buffer.push(`
+                buffer.write(`
                     ${this.getWIIcon(workItemType.name)} <span style="color: #868686">${relatedWorkItem.id}</span> <a href="#${relatedWorkItem.id}">${he.encode(relatedWorkItem.title)}</a>
                 `);
 
                 if (!options.inline) {
-                    buffer.push(`</p>`);
+                    buffer.write(`</p>`);
                 }
 
-                buffer.push(`</section>\n`);
+                buffer.write(`</section>\n`);
             } else {
-                buffer.push(`<section data-wi-links>
+                buffer.write(`<section data-wi-links>
                     <p style="margin-bottom: 0"><strong>${block.label}</strong></p>
                     <ul style="margin-top: 5px;">\n`);
 
                 for (const relatedWorkItem of links) {
                     const workItemType = this.backlog.getWorkItemType(relatedWorkItem.type);
 
-                    buffer.push(`
+                    buffer.write(`
                         <li style="list-style-type: none">
                         ${this.getWIIcon(workItemType.name)} <span style="color: #868686">${relatedWorkItem.id}</span> <a href="#${relatedWorkItem.id}">${he.encode(relatedWorkItem.title)}</a></li>
                     `);
                 }
-                buffer.push(`
+                buffer.write(`
                     </ul>
                 </section>\n`);
             }
         }
     }
 
-    protected async exportWorkItemTemplateSection(buffer: string[], block: TemplateSectionConfig, workItem: BacklogWorkItem, level: number, options : BlockRenderOptions) {
-        var fieldBuffer: string[] = [];
+    protected async exportWorkItemTemplateSection(buffer: OutputBuffer, block: TemplateSectionConfig, workItem: BacklogWorkItem, level: number, options : BlockRenderOptions) {
+        var fieldBuffer = new ArrayOutputBuffer();
 
         await this.exportWorkItemField(fieldBuffer, workItem, block.field, block.richText);
 
-        if (fieldBuffer.length > 0) {
-            buffer.push(`<section data-wi-field-name=${JSON.stringify(block.field)}>`);
+        if (fieldBuffer.buffer.length > 0) {
+            buffer.write(`<section data-wi-field-name=${JSON.stringify(block.field)}>`);
 
             if (block.header != null) {
                 if (options.inline) {
-                    buffer.push(`<strong>${block.header}</strong>`);
+                    buffer.write(`<strong>${block.header}</strong>`);
                 } else {
-                    buffer.push(`<h${level}>${block.header}</h${level}>`);
+                    buffer.write(`<h${level}>${block.header}</h${level}>`);
                 }
             }
 
-            buffer.push(...fieldBuffer);
+            buffer.write(...fieldBuffer.buffer);
 
-            buffer.push(`</section>`);
+            buffer.write(`</section>`);
         }
     }
 
-    protected async exportWorkItemTemplateMetadata(buffer: string[], block: TemplateMetadataConfig, workItem: BacklogWorkItem, level: number, options : BlockRenderOptions) {
+    protected async exportWorkItemTemplateMetadata(buffer: OutputBuffer, block: TemplateMetadataConfig, workItem: BacklogWorkItem, level: number, options : BlockRenderOptions) {
         const columns = block.columns;
 
         const cells = (await Promise.all(block.cells.map(async cell => {
-            const cellBuffer: string[] = [];
+            const cellBuffer = new ArrayOutputBuffer();
 
             if (cell.blocks) {
                 for (const block of cell.blocks) {
@@ -605,10 +607,10 @@ export class HTMLExporter extends Exporter {
             }
 
             return { cell, cellBuffer };
-        }))).filter(cell => cell.cellBuffer.length > 0);
+        }))).filter(cell => cell.cellBuffer.buffer.length > 0);
 
         if (cells.length > 0) {
-            buffer.push(`<section data-wi-metadata class="workitem-metadata">
+            buffer.write(`<section data-wi-metadata class="workitem-metadata">
             <table>`);
 
             let startRow = true;
@@ -661,31 +663,31 @@ export class HTMLExporter extends Exporter {
 
                 // Print to buffer
                 if (startRow) {
-                    buffer.push(`\n<tr>\n`);
+                    buffer.write(`\n<tr>\n`);
                     startRow = false;
                 }
 
-                buffer.push(`<td colspan="${columnSpan}">`);
-                buffer.push(...cellBuffer);
-                buffer.push(`</td>`);
+                buffer.write(`<td colspan="${columnSpan}">`);
+                buffer.write(...cellBuffer.buffer);
+                buffer.write(`</td>`);
 
                 columnOffset += columnSpan;
 
                 if (endRow) {
-                    buffer.push(`\n</tr>\n`);
+                    buffer.write(`\n</tr>\n`);
                     endRow = false;
                     startRow = true;
                     columnOffset = 0;
                 }
             }
 
-            buffer.push(`
+            buffer.write(`
                 </table>
             </section>`);
         }
     }
 
-    protected async exportWorkItem(buffer: string[], workItem: BacklogWorkItem, level: number = 1) {
+    protected async exportWorkItem(buffer: OutputBuffer, workItem: BacklogWorkItem, level: number = 1) {
         const template = this.templates.find(tpl => tpl.workItemType == workItem.type);
 
         if (template == null) {
