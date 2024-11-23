@@ -1,0 +1,88 @@
+config {
+    api organizationUrl="" \
+		token="" \
+        ignoreSsl=true
+        
+    backlog "Phase1" project="MyProject" query=r#"
+            [System.TeamProject] = @project
+            AND [System.WorkItemType] IN ('Epic', 'Feature', 'User Story', 'Bug')
+			AND [System.State] <> 'Removed'
+            ORDER BY [Microsoft.VSTS.Common.StackRank]
+            "# {
+
+        content "Epic" {
+            content "Feature" {
+                content "User Story" "Bug"
+            }
+        }
+    }
+
+    toc mode="grid" hide-header=true {
+        value width="90px"  header="State" field="System.State"
+        value width="60px" header="Story Points" field="Microsoft.VSTS.Scheduling.StoryPoints" align="right"
+        value width="200px" header="Value Area" field="Microsoft.VSTS.Common.ValueArea"
+        value width="250px" header="Tags" field="System.Tags"
+        value width="200px" header="Modified On" field="System.ChangedDate"
+    }
+
+    template "Epic" {
+        metadata columns=2 {
+            column { section header="State" field="System.State"; }
+            column { section header="Modified" field="System.ChangedDate"; }
+
+            row { tags; }
+        }
+
+        section field="System.Description" richText=true
+        links label="Features" "System.LinkTypes.Hierarchy-Forward"
+    }
+
+    template "Feature" {
+        metadata columns=2 {
+            column { section header="State" field="System.State"; }
+            column { section header="Modified" field="System.ChangedDate"; }
+
+            row { links label="Epic" "System.LinkTypes.Hierarchy-Reverse" single=true; }
+
+            row { tags; }
+        }
+
+        section field="System.Description" richText=true
+        links label="User Stories" "System.LinkTypes.Hierarchy-Forward"
+    }
+
+    template "User Story" {
+        metadata columns=2 {
+            column { section header="Iteration" field="System.IterationPath"; }
+            column { section header="Story Points" field="Microsoft.VSTS.Scheduling.StoryPoints"; }
+
+            column { section header="State" field="System.State"; }
+            column { section header="Modified" field="System.ChangedDate"; }
+
+            row { links label="Feature" single=true "System.LinkTypes.Hierarchy-Reverse"; }
+
+            row { tags; }
+        }
+
+        section field="System.Description" richText=true
+        section header="Acceptance Criteria" field="Microsoft.VSTS.Common.AcceptanceCriteria" richText=true
+        section header="Release Notes" field="Project.ReleaseNotes" richText=true
+    }
+    
+    template "Bug" {
+        metadata columns=2 {
+            column { section header="Iteration" field="System.IterationPath"; }
+            column { section header="Story Points" field="Microsoft.VSTS.Scheduling.StoryPoints"; }
+
+            column { section header="State" field="System.State"; }
+            column { section header="Modified" field="System.ChangedDate"; }
+
+            row { links label="Feature" single=true "System.LinkTypes.Hierarchy-Reverse"; }
+
+            row { tags; }
+        }
+
+        section header="Repro Steps" field="Microsoft.VSTS.TCM.ReproSteps" richText=true
+        section header="Release Notes" field="Project.ReleaseNotes" richText=true
+    }
+}

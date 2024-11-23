@@ -1,0 +1,23 @@
+html.dark .light-only {
+    display: none !important;
+}
+  
+html:not(.dark) .dark-only {
+    display: none !important;
+}
+
+.vp-code .highlighted-word {
+    /* background-color: var(--vp-c-bg-soft); */
+    border: 1px solid var(--vp-c-border);
+    padding: 1px 3px;
+    margin: -1px -3px;
+    border-radius: 4px;
+}
+
+.vp-code .highlighted-word:has( + .highlighted-word) {
+    border-right: none;
+}
+
+.vp-code .highlighted-word + .highlighted-word {
+    border-left: none;
+}

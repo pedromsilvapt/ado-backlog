@@ -1,4 +1,5 @@
 import { defineConfig } from 'vitepress'
+import { transformerNotationWordHighlight } from '@shikijs/transformers';
 import { join } from 'path';
 import fs from 'fs';
 
@@ -8,11 +9,12 @@ var kdlLang = JSON.parse(fs.readFileSync(join(__dirname, './languages/kdl.tmLang
 export default defineConfig({
   title: "ADO Backlog",
   description: "Azure DevOps Backlog Exporter Tool",
+  cleanUrls: true,
   themeConfig: {
     // https://vitepress.dev/reference/default-theme-config
     nav: [
       { text: 'Guide', link: '/guide/getting-started' },
-      { text: 'Reference', link: '/reference/command-line' },
+      // { text: 'Reference', link: '/reference/command-line' },
       { text: 'Release Notes', link: '/release-notes' }
     ],
 
@@ -22,7 +24,14 @@ export default defineConfig({
           text: 'Guide',
           items: [
             { text: 'Getting Started', link: '/guide/getting-started' },
-            { text: 'Config Examples', link: '/guide/config-examples' }
+            {
+              text: 'Configuration',
+              items: [
+                { text: 'API', link: '/guide/configuration/api' },
+                { text: 'Backlog', link: '/guide/configuration/backlog' },
+                { text: 'Templates', link: '/guide/configuration/templates' }
+              ]
+            }
           ]
         }
       ],
@@ -30,25 +39,40 @@ export default defineConfig({
         {
           text: 'Reference',
           items: [
-            { text: 'Command Line', link: '/refence/command-line' },
-            { text: 'Configuration', link: '/reference/configuration' }
+            { text: 'Command Line', link: '/reference/command-line' },
+            {
+              text: 'Configuration', link: '/reference/configuration',
+              items: [
+                { text: 'API', link: '/' }
+              ]
+            }
           ]
         }
       ]
     },
 
+    outline: {
+      level: [2, 3]
+    },
+
     socialLinks: [
-      { icon: 'github', link: 'https://github.com/vuejs/vitepress' }
+      { icon: 'github', link: 'https://github.com/pedromsilvapt/ado-backlog' }
     ],
 
     search: {
-      provider: 'local'
+      provider: 'local',
+      options: {
+        detailedView: true,
+      }
     }
   },
   markdown: {
     languages: [ kdlLang ],
     languageAlias: {
       kdl: 'KDL'
-    }
+    },
+    codeTransformers: [
+      transformerNotationWordHighlight({})
+    ]
   }
 })

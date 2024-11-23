@@ -23,7 +23,7 @@
     "docs:build": "vitepress build docs",
     "docs:preview": "vitepress preview docs"
   },
-  "author": "Pedro M. Silva <pedrosilva@criticalmanufacturing.com>",
+  "author": "Pedro M. Silva <pemiolsi@hotmail.com>",
   "license": "ISC",
   "dependencies": {
     "@clack/prompts": "^0.7.0",
