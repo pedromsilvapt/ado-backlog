@@ -24,8 +24,8 @@ backlog "Phase1" project="MyProject" query=r#"
         ORDER BY [Microsoft.VSTS.Common.StackRank]
         "# {
 
-        brand "assets/CriticalManufacturing.png"
-        brand "assets/Vandewiele.png"
+        brand "assets/MyCompany.png"
+        brand "assets/CustomerCompany.png"
 
         output "_archive/{{it.backlogConfig.name}}-{{it.now | format('yyyyMMdd')}}.html" mkdir=true overwrite=true
         output "{{it.backlogConfig.name}}.html" overwrite=true

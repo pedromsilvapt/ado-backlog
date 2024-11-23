@@ -7,7 +7,7 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
-## Unreleased
+## [0.4.0] - 2024-11-23
 
 ### Added
  - Allow setting the `mkdir` and `overwrite` properties on the output configurations
@@ -112,6 +112,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
         ignored-value "-" // [!code ++]
    }
    ```
+ - Added possibility to customize Copyright information displayed on the footer of the document.
+   ```kdl:line-numbers
+   // [!code word:copyright]
+   backlog copyright="<Your Company Name>" ... {
+   ```
+   ::: danger Breaking Change
+   This new property must be added to all `backlog` entries
+   :::
 
 ### Fixed
  - Fixed topbar hiding top of work items when clicking on links to them
@@ -146,8 +154,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
     :::
  - Add Brand images to a backlog, to be included on the top of the document. They are spaced evenly among themselves on an horizontal axis.
     ```kdl
-    brand "CriticalManufacturing.png"
-    brand "Vandewiele.png"
+    brand "assets/MyCompany.png"
+    brand "assets/CustomerCompany.png"
     ```
     For better results, the images should:
       - Follow the style of an horizontal banner, with the logo on the left, and the brand name on the right side
@@ -196,13 +204,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
         [System.ChangedDate] >= '2024-04-08T00:00:00.0000000'
     "#
     view "Sprint 3 (Previous)" query=r#"
-        [System.IterationPath] = @currentIteration('[Vandewiele]\Vandewiele Team <id:6ae09c99-d9f7-48c9-9c62-cc518e22f096>') - 1
+        [System.IterationPath] = @currentIteration('[Project]\Project Team <id:6ae09c99-d9f7-48c9-9c62-cc518e22f096>') - 1
     "#
     view "Sprint 4 (Current)" query=r#"
-        [System.IterationPath] = @currentIteration('[Vandewiele]\Vandewiele Team <id:6ae09c99-d9f7-48c9-9c62-cc518e22f096>')
+        [System.IterationPath] = @currentIteration('[Project]\Project Team <id:6ae09c99-d9f7-48c9-9c62-cc518e22f096>')
     "#
     view "Sprint 5 (Next - Pre-planning)" query=r#"
-        [System.IterationPath] = @currentIteration('[Vandewiele]\Vandewiele Team <id:6ae09c99-d9f7-48c9-9c62-cc518e22f096>') + 1
+        [System.IterationPath] = @currentIteration('[Project]\Project Team <id:6ae09c99-d9f7-48c9-9c62-cc518e22f096>') + 1
     "#
     ```
     The same query facilities (id, name, wiql) are available here as they are on the backlog level.
@@ -212,7 +220,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
     :::
 
     ::: tip
-    If the WIQL query is used on both the Backlog and the View, the View query will also apply the same conditions as the backlog does, in addition to whatever specific conditions the view has. To get the WIQL string, you can build a query in TFS and then click the button **Edit WIQL**
+    If the WIQL query is used on both the Backlog and the View, the View query will also apply the same conditions as the backlog does, in addition to whatever specific conditions the view has. To get the WIQL string, you can build a query in ADO and then click the button **Edit WIQL**
     :::
  - Back to top button on the bottom right corner of the screen
  - Optional `--config`/`-c` to specify a config file path different from the default `config.kdl`. This allows to have multiple config files for different backlogs, and choose which one to export.

@@ -197,7 +197,7 @@ export class HTMLExporter extends Exporter {
                     var src = dom(imgElem).attr('src');
 
                     if (src != null) {
-                        // TODO Test src http if it matches TFS url
+                        // TODO Test src http if it matches ADO url
                         var imageStream = await this.azure.downloadAttachmentUrlBase64(src);
 
                         if (imageStream != null) {
@@ -493,7 +493,7 @@ export class HTMLExporter extends Exporter {
 
     protected async exportFooter(buffer: OutputBuffer) {
         buffer.write(`<footer style="text-align: center; color: gray">
-            Critical Manufacturing. Document generated in ${luxon.DateTime.now().toFormat("DDDD")}.
+            ${this.backlog.config.copyright}. Document generated in ${luxon.DateTime.now().toFormat("DDDD")}.
         </footer>`);
     }
 

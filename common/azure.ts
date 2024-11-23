@@ -53,7 +53,7 @@ export class AzureClient {
 
         const coreApi = await this.connection.getCoreApi();
 
-        this.logger.debug(pp`Retrieving list of TFS projects...`);
+        this.logger.debug(pp`Retrieving list of ADO projects...`);
 
         const allProjects = await coreApi.getProjects();
 
@@ -339,7 +339,7 @@ export class AzureClient {
     }
 
     // Example of URL:
-    // https://tfs-projects.cmf.criticalmanufacturing.com/ImplementationProjects/24b0b677-01e3-4b83-b85e-048e53f7a098/_apis/wit/attachments/a8e5f541-5b7e-4d15-b05d-b44876f4a5d4?fileName=image.png
+    // https://dev.azure.com/{{username}}/24b0b677-01e3-4b83-b85e-048e53f7a098/_apis/wit/attachments/a8e5f541-5b7e-4d15-b05d-b44876f4a5d4?fileName=image.png
     // <DeploymentUrl>/<ProjectId>/_apis/wit/attachments/<AttachmentId>?fileName=<FileName>
     static ATTACHMENT_URL_REGEX = /(?<projectId>[a-zA-Z0-9\-]+)\/_apis\/wit\/attachments\/(?<attachmentId>[a-zA-Z0-9\-]+)\?fileName=(?<fileName>[^&]+)/;
 

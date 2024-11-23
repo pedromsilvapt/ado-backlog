@@ -118,7 +118,7 @@ export class InitCommand extends Command {
 		token="${token}" \\
         ignoreSsl=false
 
-    backlog "${projectName}" project="${projectName}" query=r#"
+    backlog "${projectName}" copyright="<Your Company Name>" project="${projectName}" query=r#"
             [System.TeamProject] = @project
             AND [System.WorkItemType] IN ('Epic', 'Feature', 'User Story', 'Bug')
 			AND [System.State] <> 'Removed'

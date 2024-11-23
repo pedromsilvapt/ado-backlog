@@ -1,5 +1,5 @@
 {
-  "name": "tfs-backlog",
+  "name": "ado-backlog",
   "version": "0.4.0",
   "description": "Azure DevOps Backlog Exporter Tool",
   "main": "server/index.js",

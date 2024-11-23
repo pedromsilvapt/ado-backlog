@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
-## Unreleased
+## [0.4.0] - 2024-11-23
 
 ### Added
  - Allow setting the `mkdir` and `overwrite` properties on the output configurations
@@ -12,9 +12,116 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
     output "_archive/{{it.backlogConfig.name}}-{{it.now | format('yyyyMMdd')}}.html" mkdir=true
     output "{{it.backlogConfig.name}}.html" overwrite=true
     ```
+ - Added the [`ado-backlog init`](/guide/getting-started#usage) command to scaffold a basic configuration file
+ - Added `--profile` option to `download` command to display time statistics.
+    
+   ```shell
+   # The ellipsis ... represent any other options you
+   # normally pass to the download command
+   ado-backlog download --profile ...
+   ```
+ - Config option `fetch-parents` for backlog content
+    ```kdl
+    // [!code word:fetch-parents=true]
+    content-defaults fetch-parents=true
+
+    content "Epic" {
+        // ...
+    ```
+   :::: details More details
+
+   When this option is active, only the child work items (**User Story** and **Bugs** in the example above) need to be specified in the backlog query. Their parents will be fetched on demand and automatically included on the backlog. 
+   
+   This means that the backlog query can, **optionally**, be modified according to the example below and still export the same work items.
+    ```kdl:line-numbers
+    backlog "Phase1" project="MyProject" query=r#"
+            [System.TeamProject] = @project
+            AND [System.WorkItemType] IN ('Epic', 'Feature', 'User Story', 'Bug') // [!code --]
+            AND [System.WorkItemType] IN ('User Story', 'Bug') // [!code ++]
+            AND [System.State] <> 'Removed'
+            "# {
+    ```
+    ::::
+
+    ::: danger Breaking Change
+    This behavior is now enabled **by default**. This means that parent work items that were not previously included in backlogs, might from now on start to be. You can revert back to the previous behavior by setting `fetch-parents=false`.
+    :::
+ - Config option `order-by` for backlog content
+    ```kdl
+    content-defaults fetch-parents=true {
+        order-by "Microsoft.VSTS.Common.StackRank" // [!code ++]
+    }
+
+    content "Epic" {
+        // ...
+    ```
+    :::: details More details
+    You can also specify multiple order-by tags, and specify different directions (`asc` by default, or `desc` if specified) for each of them.
+
+    ```kdl
+    content-defaults fetch-parents=true {
+        order-by "Microsoft.VSTS.Common.Priority" "desc" // [!code ++]
+        order-by "Microsoft.VSTS.Common.StackRank" "asc" // [!code ++]
+    }
+    ```
+
+    The example above will sort work items by **Priority** in **descending** order first. Any work items with the same priority, will be sorted amongst themselves by **Stack Rank**, in **ascending** order.
+
+    Additionally, this option can also be overridden for each `content` level.    
+    ```kdl
+    content-defaults fetch-parents=true {
+        order-by "Microsoft.VSTS.Common.StackRank"
+    }
+
+    content "Epic" {
+        content "Feature" {
+            content "User Story" "Bug" {
+                order-by "Microsoft.VSTS.Common.Priority" "desc" // [!code ++]
+            }
+        }
+    }
+    ```
+    **Note** that the ordering applies to the content where it is, not to it's children. Here, **Epics** and **Features** would follow the stack rank order, but inside each Feature, **User Stories** and **Bugs** would follow the Priority order instead.
+    ::::
+    
+    ::: danger Breaking Change
+    This behavior is now enabled by default, sorting by `Microsoft.VSTS.Common.StackRank` unless explicitly configured otherwise.
+
+    This means that the `ORDER BY` clause **returned by the query is ignored**. If your query was ordering by the stack rank property, you can just remove it.
+
+    ```kdl:line-numbers
+    backlog "Phase1" project="MyProject" query=r#"
+            [System.TeamProject] = @project
+            AND [System.WorkItemType] IN ('User Story', 'Bug')
+            AND [System.State] <> 'Removed'
+            ORDER BY [Microsoft.VSTS.Common.StackRank] // [!code --]
+            "# {
+    ```
+
+    If your `ORDER BY` clause was returning the work items sorted by a different field, you must now configure that field on the `order-by` tag instead.
+    :::
+ - Repeated downloads of the same backlog are now faster thanks to some performance optimizations, and a new optional cache system.
+ - Fields with default values can be ignored (considered as empty) by specified the list of possible values to be ignored
+   ```kdl:line-numbers
+   section header="Release Notes" field="Project.ReleaseNotes" richText=true {
+        // If the field has this value (a single dash), then it is considered 
+        // as empty and is not exported [!code hl]
+        ignored-value "-" // [!code ++]
+   }
+   ```
+ - Added possibility to customize Copyright information displayed on the footer of the document.
+   ```kdl:line-numbers
+   // [!code word:copyright]
+   backlog copyright="<Your Company Name>" ... {
+   ```
+   ::: danger Breaking Change
+   This new property must be added to all `backlog` entries
+   :::
 
 ### Fixed
  - Fixed topbar hiding top of work items when clicking on links to them
+ - Fixed error thrown when downloading a backlog containing a work item without any relation at all
+ - Bold text was not rendering as bold when exporting
 
 
 ## [0.3.0] - 2024-05-17
@@ -44,8 +151,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
     :::
  - Add Brand images to a backlog, to be included on the top of the document. They are spaced evenly among themselves on an horizontal axis.
     ```kdl
-    brand "CriticalManufacturing.png"
-    brand "Vandewiele.png"
+    brand "assets/MyCompany.png"
+    brand "assets/CustomerCompany.png"
     ```
     For better results, the images should:
       - Follow the style of an horizontal banner, with the logo on the left, and the brand name on the right side
@@ -94,13 +201,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
         [System.ChangedDate] >= '2024-04-08T00:00:00.0000000'
     "#
     view "Sprint 3 (Previous)" query=r#"
-        [System.IterationPath] = @currentIteration('[Vandewiele]\Vandewiele Team <id:6ae09c99-d9f7-48c9-9c62-cc518e22f096>') - 1
+        [System.IterationPath] = @currentIteration('[Project]\Project Team <id:6ae09c99-d9f7-48c9-9c62-cc518e22f096>') - 1
     "#
     view "Sprint 4 (Current)" query=r#"
-        [System.IterationPath] = @currentIteration('[Vandewiele]\Vandewiele Team <id:6ae09c99-d9f7-48c9-9c62-cc518e22f096>')
+        [System.IterationPath] = @currentIteration('[Project]\Project Team <id:6ae09c99-d9f7-48c9-9c62-cc518e22f096>')
     "#
     view "Sprint 5 (Next - Pre-planning)" query=r#"
-        [System.IterationPath] = @currentIteration('[Vandewiele]\Vandewiele Team <id:6ae09c99-d9f7-48c9-9c62-cc518e22f096>') + 1
+        [System.IterationPath] = @currentIteration('[Project]\Project Team <id:6ae09c99-d9f7-48c9-9c62-cc518e22f096>') + 1
     "#
     ```
     The same query facilities (id, name, wiql) are available here as they are on the backlog level.
@@ -110,7 +217,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
     :::
 
     ::: tip
-    If the WIQL query is used on both the Backlog and the View, the View query will also apply the same conditions as the backlog does, in addition to whatever specific conditions the view has. To get the WIQL string, you can build a query in TFS and then click the button **Edit WIQL**
+    If the WIQL query is used on both the Backlog and the View, the View query will also apply the same conditions as the backlog does, in addition to whatever specific conditions the view has. To get the WIQL string, you can build a query in ADO and then click the button **Edit WIQL**
     :::
  - Back to top button on the bottom right corner of the screen
  - Optional `--config`/`-c` to specify a config file path different from the default `config.kdl`. This allows to have multiple config files for different backlogs, and choose which one to export.

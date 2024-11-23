@@ -3,7 +3,7 @@ import { transformerNotationWordHighlight } from '@shikijs/transformers';
 import { join } from 'path';
 import fs from 'fs';
 
-var kdlLang = JSON.parse(fs.readFileSync(join(__dirname, './languages/kdl.tmLanguage.json'), 'utf8'));
+var kdlLang = JSON.parse(fs.readFileSync(join(__dirname, './languages/kdl.tmlanguage.json'), 'utf8'));
 
 // https://vitepress.dev/reference/site-config
 export default defineConfig({
@@ -68,9 +68,6 @@ export default defineConfig({
   },
   markdown: {
     languages: [ kdlLang ],
-    languageAlias: {
-      kdl: 'KDL'
-    },
     codeTransformers: [
       transformerNotationWordHighlight({})
     ]

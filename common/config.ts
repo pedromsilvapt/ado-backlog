@@ -152,6 +152,9 @@ export class BacklogConfig {
     @Property('project', String)
     project!: string;
 
+    @Property('copyright', String)
+    copyright!: string;
+
     @Children('brand', BrandConfig)
     brands!: BrandConfig[];
 

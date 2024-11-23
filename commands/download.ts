@@ -112,7 +112,7 @@ export class DownloadCommand extends Command {
             const project = await azure.getProjectByName(backlogConfig.project);
 
             if (project == null) {
-                logger.error(pp`No project found in the TFS named ${backlogConfig.project}`);
+                logger.error(pp`No project found in the ADO named ${backlogConfig.project}`);
                 return;
             }
 
