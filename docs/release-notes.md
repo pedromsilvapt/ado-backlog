@@ -103,10 +103,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
     If your `ORDER BY` clause was returning the work items sorted by a different field, you must now configure that field on the `order-by` tag instead.
     :::
+ - Repeated downloads of the same backlog are now faster thanks to some performance optimizations, and a new optional cache system.
+ - Fields with default values can be ignored (considered as empty) by specified the list of possible values to be ignored
+   ```kdl:line-numbers
+   section header="Release Notes" field="Project.ReleaseNotes" richText=true {
+        // If the field has this value (a single dash), then it is considered 
+        // as empty and is not exported [!code hl]
+        ignored-value "-" // [!code ++]
+   }
+   ```
 
 ### Fixed
  - Fixed topbar hiding top of work items when clicking on links to them
  - Fixed error thrown when downloading a backlog containing a work item without any relation at all
+ - Bold text was not rendering as bold when exporting
 
 
 ## [0.3.0] - 2024-05-17

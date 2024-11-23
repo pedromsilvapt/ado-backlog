@@ -257,6 +257,9 @@ export class TemplateSectionConfig {
 
     @Optional() @Property("richText", Boolean)
     richText!: boolean;
+
+    @Optional() @Children("ignored-value", String)
+    ignoredValues?: string[]
 }
 
 BlockConfigTags['section'] = TemplateSectionConfig;

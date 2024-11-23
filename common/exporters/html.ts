@@ -11,11 +11,12 @@ import * as cheerio from 'cheerio';
 import * as luxon from 'luxon';
 import * as path from 'path';
 
-
 export class HTMLExporter extends Exporter {
     public readonly name: string = 'html';
 
     protected _workItemIconName: Record<string, string> = {};
+
+    protected _lastExportedFile: string | undefined;
 
     public accepts(output: string): boolean {
         const outputLower = output.toLowerCase();
@@ -166,8 +167,12 @@ export class HTMLExporter extends Exporter {
         buffer.write(`</style>\n`);
     }
 
-    protected async exportWorkItemField(buffer: OutputBuffer, workItem: BacklogWorkItem, field: string, richText: boolean = false) {
-        const value = workItem.workItem.fields?.[field];
+    protected async exportWorkItemField(buffer: OutputBuffer, workItem: BacklogWorkItem, field: string, richText: boolean = false, ignoredValues: string[] | null = null) {
+        let value = workItem.workItem.fields?.[field];
+
+        if (ignoredValues != null && ignoredValues.includes(value)) {
+            value = null;
+        }
 
         if (value != null && value != "") {
             // TODO Remove hard-coded type validation
@@ -588,7 +593,7 @@ export class HTMLExporter extends Exporter {
     protected async exportWorkItemTemplateSection(buffer: OutputBuffer, block: TemplateSectionConfig, workItem: BacklogWorkItem, level: number, options : BlockRenderOptions) {
         var fieldBuffer = new StringOutputBuffer();
 
-        await this.exportWorkItemField(fieldBuffer, workItem, block.field, block.richText);
+        await this.exportWorkItemField(fieldBuffer, workItem, block.field, block.richText, block.ignoredValues);
 
         if (fieldBuffer.buffer.length > 0) {
             buffer.write(`<section data-wi-field-name=${JSON.stringify(block.field)}>`);
