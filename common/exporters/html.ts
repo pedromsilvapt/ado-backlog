@@ -1157,6 +1157,10 @@ body {
   max-width: 100%;
 }
 
+body b {
+  font-weight: 600;
+}
+
 div.centered-layout {
     margin: 6rem auto 1rem;
     max-width: 48rem;
