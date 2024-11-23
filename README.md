@@ -1,5 +1,5 @@
 # ADO Backlog
-
+[Documentation](https://pedromsilvapt.github.io/ado-backlog/) | [Release Notes](https://pedromsilvapt.github.io/ado-backlog/release-notes) | [Download](https://github.com/pedromsilvapt/ado-backlog/releases)
 
 ## Usage
 In Azure DevOps, generate a new Personal Token. Edit the file `config.kdl`, and add the generated token.
