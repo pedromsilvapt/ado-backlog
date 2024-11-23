@@ -10,6 +10,7 @@ export default defineConfig({
   title: "ADO Backlog",
   description: "Azure DevOps Backlog Exporter Tool",
   cleanUrls: true,
+  base: '/ado-backlog/',
   themeConfig: {
     // https://vitepress.dev/reference/default-theme-config
     nav: [
