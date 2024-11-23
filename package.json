@@ -1,7 +1,7 @@
 {
   "name": "tfs-backlog",
   "version": "0.4.0",
-  "description": "",
+  "description": "Azure DevOps Backlog Exporter Tool",
   "main": "server/index.js",
   "bin": "cli.js",
   "pkg": {
@@ -55,6 +55,6 @@
     "@types/mz": "^2.7.8",
     "@types/turndown": "^5.0.4",
     "@types/yargs": "^17.0.32",
-    "vitepress": "^1.3.4",
+    "vitepress": "^1.3.4"
   }
 }
