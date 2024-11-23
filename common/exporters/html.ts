@@ -53,6 +53,11 @@ export class HTMLExporter extends Exporter {
             }
         }
 
+        if (this._lastExportedFile != null) {
+            await fs.copyFile(this._lastExportedFile, output);
+            return;
+        }
+
         const buffer = new FileOutputBuffer(output);
 
         buffer.write(`<!doctype html>
@@ -94,6 +99,8 @@ export class HTMLExporter extends Exporter {
         </html>`);
 
         buffer.stream.close();
+
+        this._lastExportedFile = output;
     }
 
     public tagIcon = 'tag';
