@@ -13,6 +13,8 @@ export abstract class Command {
 
     metrics: IMetricsContainer | null = null;
 
+    readonly loadConfig: boolean = true;
+
     abstract readonly name : string;
 
     abstract readonly usage : string;
@@ -21,9 +23,12 @@ export abstract class Command {
 
     public register( yargv : yargs.Argv ) : yargs.Argv {
         return yargv.command( this.name, this.usage, this.configure.bind(this), async (argv) => {
+            const configPath = (argv.config as string) || 'config.kdl';
 
             // Load configuration file from the current working directory
-            const config: TfsConfig = Config.load((argv.config as string) || 'config.kdl', TfsConfigFormat).data;
+            const config: TfsConfig = this.loadConfig
+                ? Config.load(configPath, TfsConfigFormat).data
+                : new TfsConfig();
 
             // Configure Logger
             const logger = new SharedLogger(new MultiBackend([

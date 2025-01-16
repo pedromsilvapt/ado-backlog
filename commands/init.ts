@@ -10,6 +10,8 @@ export class InitCommand extends Command {
 
     public readonly usage: string = "init [configFile]";
 
+    public readonly loadConfig: boolean = false;
+
     public configure(yargs: yargs.Argv<{}>): void {
         yargs.positional('configFile', {
             type: 'string',

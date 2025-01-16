@@ -15,7 +15,7 @@ const DAY_FORMAT = 'yyyyMMdd';
 const SPRINT_FORMAT = 'dd MMM';
 
 export class AzureClient {
-    protected connection: azdev.WebApi;
+    public connection: azdev.WebApi;
 
     public logger: LoggerInterface;
 
